@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CREARTOOLS - Upload & Share 3DGS</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #1a1a1a; color: white; font-family: sans-serif; }
+        #canvas-3d { width: 100vw; height: 100vh; display: block; }
+        
+        /* UI Overlay untuk Upload */
+        #ui-container {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0, 0, 0, 0.7); padding: 20px;
+            border-radius: 8px; z-index: 10;
+        }
+        input, button { margin-top: 10px; display: block; }
+        #share-link { margin-top: 15px; color: #4ade80; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <h3>Upload Aset Aholo (.splat/.ply)</h3>
+        <input type="file" id="file-input" accept=".splat,.ply" />
+        <button id="upload-btn">Upload & Generate Link</button>
+        <p id="status-text"></p>
+        <a id="share-link" href="#" target="_blank" style="display: none;"></a>
+    </div>
+
+    <canvas id="canvas-3d"></canvas>
+
+    <script type="module">
+        // Import Supabase & Aholo Viewer via CDN
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+        import { Viewer } from 'https://esm.sh/@manycore/aholo-viewer'; 
+
+        // Kredensial Supabase Kamu
+        const supabaseUrl = 'https://ogmtrdzimqlxhzomnnzl.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Inisialisasi Viewer
+        const canvas = document.getElementById('canvas-3d');
+        const viewer = new Viewer(canvas);
+
+        // UI Elements
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const statusText = document.getElementById('status-text');
+        const shareLinkEl = document.getElementById('share-link');
+        const uiContainer = document.getElementById('ui-container');
+
+        // ==========================================
+        // FITUR 1: CEK APAKAH INI LINK SHARE?
+        // ==========================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedId = urlParams.get('id');
+
+        if (sharedId) {
+            // Sembunyikan UI Upload saat mode melihat hasil share
+            uiContainer.style.display = 'none';
+            loadSharedModel(sharedId);
+        }
+
+        async function loadSharedModel(id) {
+            try {
+                // Ambil URL file dari database berdasarkan ID
+                const { data, error } = await supabase
+                    .from('shared_assets')
+                    .select('file_url')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+
+                if (data && data.file_url) {
+                    console.log("Memuat model dari:", data.file_url);
+                    await viewer.load(data.file_url);
+                    viewer.start();
+                }
+            } catch (err) {
+                alert("Gagal memuat model. Mungkin ID tidak valid.");
+                console.error(err);
+            }
+        }
+
+        // ==========================================
+        // FITUR 2: UPLOAD & SIMPAN KE DATABASE
+        // ==========================================
+        uploadBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return alert("Pilih file terlebih dahulu!");
+
+            try {
+                uploadBtn.disabled = true;
+                statusText.innerText = "Mengunggah file ke Storage...";
+
+                // 1. Upload ke Supabase Storage (Bucket: 'models')
+                const fileName = `${Date.now()}_${file.name}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('models')
+                    .upload(fileName, file);
+
+                if (uploadError) throw uploadError;
+
+                // 2. Dapatkan Public URL dari file yang diupload
+                const { data: publicUrlData } = supabase.storage
+                    .from('models')
+                    .getPublicUrl(fileName);
+                const fileUrl = publicUrlData.publicUrl;
+
+                statusText.innerText = "Menyimpan ke Database...";
+
+                // 3. Simpan URL ke Database tabel 'shared_assets'
+                const { data: dbData, error: dbError } = await supabase
+                    .from('shared_assets')
+                    .insert([{ file_url: fileUrl }])
+                    .select()
+                    .single();
+
+                if (dbError) throw dbError;
+
+                // 4. Generate Link Share
+                const shareUrl = `${window.location.origin}${window.location.pathname}?id=${dbData.id}`;
+                
+                statusText.innerText = "Upload Berhasil!";
+                shareLinkEl.href = shareUrl;
+                shareLinkEl.innerText = `Link Share: ${shareUrl}`;
+                shareLinkEl.style.display = 'block';
+
+                // Opsional: Langsung render model yang baru diupload
+                await viewer.load(fileUrl);
+                viewer.start();
+
+            } catch (err) {
+                statusText.innerText = "Terjadi kesalahan saat upload.";
+                console.error("Error:", err);
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
