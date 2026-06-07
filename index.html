@@ -6,20 +6,18 @@
 <title>Creartor AR — Spatial Workspace</title>
 
 <!-- ============================================================
-     SETUP (one time): run supabase-setup.sql in your Supabase
-     SQL Editor, create the PUBLIC storage bucket "models",
-     and enable Email auth. Then deploy this file.
+     SETUP (one time): run supabase-setup.sql in your Supabase SQL
+     Editor (it adds the GLB + USDZ columns), keep the PUBLIC bucket
+     "models", enable Email auth. Then deploy this file.
+     Each asset = 1 GLB/GLTF (web + Android AR) + optional USDZ (iOS AR).
      ============================================================ -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
-<!-- 3D + WebAR -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-<!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- QR code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
@@ -102,15 +100,21 @@
 
   .stage{position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.10), transparent 55%),radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0),linear-gradient(180deg,#101014,#0b0b0e);background-size:auto,28px 28px,auto;aspect-ratio:1/1;min-height:420px}
   model-viewer{width:100%;height:100%;background:transparent;--poster-color:transparent}
-  #stageViewer{position:absolute;inset:0}
-  .hud{position:absolute;inset:0;pointer-events:none;padding:18px;display:flex;flex-direction:column;justify-content:space-between}
+  #stageViewer,#sharedViewer{position:absolute;inset:0}
+  .stage-empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:24px}
+  .stage-empty .se-ic{width:66px;height:66px;border-radius:18px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line);color:var(--signal);margin-bottom:8px}
+  .stage-empty .se-ic svg{width:30px;height:30px}
+  .stage-empty p{font-family:"Syne",sans-serif;font-weight:700;font-size:18px;color:var(--text)}
+  .stage-empty small{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--text-3);max-width:30ch}
+
+  .hud{position:absolute;inset:0;pointer-events:none;padding:18px;display:flex;flex-direction:column;justify-content:space-between;z-index:3}
   .hud .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .hud .now{pointer-events:auto;display:flex;flex-direction:column;gap:6px;max-width:70%}
   .hud .now .name{font-family:"Syne",sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em}
   .hud .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:var(--text-2)}
   .chip.sig{color:var(--signal);border-color:rgba(205,242,74,.35)}
-  .crop{position:absolute;width:16px;height:16px;border:1.5px solid rgba(255,255,255,.22)}
+  .crop{position:absolute;width:16px;height:16px;border:1.5px solid rgba(255,255,255,.22);z-index:3}
   .crop.tl{top:14px;left:14px;border-right:none;border-bottom:none}.crop.tr{top:14px;right:14px;border-left:none;border-bottom:none}
   .crop.bl{bottom:14px;left:14px;border-right:none;border-top:none}.crop.br{bottom:14px;right:14px;border-left:none;border-top:none}
   .toolbar{pointer-events:auto;align-self:center;display:flex;gap:4px;padding:6px;background:rgba(12,12,15,.78);backdrop-filter:blur(14px);border:1px solid var(--line-strong);border-radius:14px;box-shadow:0 16px 40px -16px rgba(0,0,0,.7)}
@@ -130,14 +134,21 @@
   .panel-head h2{font-family:"Syne",sans-serif;font-size:16px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
   .panel-head h2 .ix{font-family:"Space Mono",monospace;font-size:11px;color:var(--signal);font-weight:700}
   .panel-body{padding:20px}
-  .dropzone{border:1.5px dashed var(--line-strong);border-radius:13px;padding:26px 18px;text-align:center;transition:.25s var(--ease);cursor:pointer;background:rgba(255,255,255,.015);position:relative;overflow:hidden}
+
+  .dz-grid{display:flex;flex-direction:column;gap:10px}
+  .dropzone{border:1.5px dashed var(--line-strong);border-radius:13px;padding:18px 16px;text-align:center;transition:.25s var(--ease);cursor:pointer;background:rgba(255,255,255,.015);position:relative;overflow:hidden}
   .dropzone:hover{border-color:var(--signal);background:rgba(205,242,74,.04)}
   .dropzone.drag{border-color:var(--signal);background:rgba(205,242,74,.09);transform:scale(1.01)}
-  .dropzone .ic{width:48px;height:48px;margin:0 auto 12px;border-radius:12px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line);color:var(--signal)}
-  .dropzone .ic svg{width:22px;height:22px}
-  .dropzone p{font-weight:600;font-size:14px}
-  .dropzone small{display:block;margin-top:5px;color:var(--text-3);font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em}
+  .dropzone .ic{width:40px;height:40px;margin:0 auto 9px;border-radius:11px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line);color:var(--signal);transition:.2s}
+  .dropzone.opt .ic{color:var(--text-2)}
+  .dropzone.opt:hover .ic,.dropzone.opt.has .ic,.dropzone.has .ic{color:var(--signal)}
+  .dropzone .ic svg{width:19px;height:19px}
+  .dropzone p{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dropzone small{display:block;margin-top:4px;color:var(--text-3);font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.04em}
+  .dropzone.has{border-style:solid;border-color:rgba(205,242,74,.45);background:rgba(205,242,74,.05)}
   .dropzone.has p{color:var(--signal)}
+  .dz-tag{position:absolute;top:9px;right:11px;font-family:"Space Mono",monospace;font-size:9px;letter-spacing:.1em;color:var(--text-3);text-transform:uppercase}
+
   .repo-list{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding-right:4px}
   .repo-list::-webkit-scrollbar{width:6px}.repo-list::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px}
   .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden}
@@ -148,8 +159,9 @@
   .thumb svg{width:26px;height:26px;color:var(--text-3)}
   .thumb model-viewer{position:absolute;inset:0}
   .asset .meta{flex:1;min-width:0}
-  .asset .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .asset .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
   .asset .meta .sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-3);margin-top:3px}
+  .badge-ios{font-family:"Space Mono",monospace;font-size:9px;letter-spacing:.06em;padding:2px 6px;border-radius:5px;background:rgba(205,242,74,.12);color:var(--signal);border:1px solid rgba(205,242,74,.3);margin-left:7px;flex-shrink:0}
   .asset .acts{display:flex;gap:4px;opacity:0;transition:.2s}
   .asset:hover .acts,.asset.active .acts{opacity:1}
   .iconbtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--text-3);border:1px solid transparent;transition:.18s}
@@ -159,7 +171,6 @@
   .empty{text-align:center;padding:30px 10px;color:var(--text-3)}
   .empty .mono{font-size:11px;letter-spacing:.1em}
 
-  /* modal */
   .overlay{position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:24px;background:rgba(5,5,7,.7);backdrop-filter:blur(6px)}
   .overlay.show{display:grid;animation:fade .3s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -174,12 +185,11 @@
   .closeX{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line)}
   .closeX:hover{color:var(--text);background:var(--surface-3)}
 
-  /* shared public view */
   #sharedView{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent),var(--bg)}
   #sharedView header{display:flex;align-items:center;justify-content:space-between;padding:18px clamp(16px,4vw,40px);border-bottom:1px solid var(--line)}
   #sharedView .sv-stage{flex:1;position:relative;margin:clamp(16px,3vw,28px);border:1px solid var(--line);border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.10), transparent 55%),radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0),linear-gradient(180deg,#101014,#0b0b0e);background-size:auto,28px 28px,auto}
-  #sharedView .sv-banner{position:absolute;top:18px;left:18px;display:flex;flex-direction:column;gap:6px}
-  #sharedView .sv-banner .nm{font-family:"Syne";font-weight:700;font-size:20px}
+  #sharedView .sv-banner{position:absolute;top:18px;left:18px;display:flex;flex-direction:column;gap:6px;z-index:3}
+  #sharedView .sv-banner .nm{font-family:"Syne",sans-serif;font-weight:700;font-size:20px}
 
   #toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,140%);z-index:80;background:var(--surface-3);border:1px solid var(--line-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;transition:transform .45s var(--ease);box-shadow:0 20px 50px -20px rgba(0,0,0,.8);max-width:90vw}
   #toast.show{transform:translate(-50%,0)}
@@ -206,7 +216,7 @@
       <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CREARTOR<b>·AR</b></span></a>
       <div>
         <h1>Build, view &amp;<br/>share in <em>spatial 3D.</em></h1>
-        <p>Upload GLB / GLTF / USDZ assets to your cloud repository and launch them straight into augmented reality.</p>
+        <p>Upload a GLB for web &amp; Android AR, add a USDZ for native iPhone AR, and share both in one link.</p>
       </div>
       <div class="auth-feats"><span class="pill">GLB</span><span class="pill">GLTF</span><span class="pill">USDZ</span><span class="pill"><span class="dot"></span>WEBXR</span></div>
     </div>
@@ -247,6 +257,11 @@
     <section class="stagewrap">
       <div class="stage">
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <div class="stage-empty" id="stageEmpty">
+          <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
+          <p>AR-only asset (USDZ)</p>
+          <small>This asset has no web model. Open the share link on an iPhone / iPad to view it in AR.</small>
+        </div>
         <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
         <div class="hud">
           <div class="top">
@@ -268,7 +283,7 @@
       <div class="stage-meta">
         <div class="m"><b id="mFormat">—</b><span>Format</span></div>
         <div class="m"><b id="mSize">—</b><span>File size</span></div>
-        <div class="m"><b id="mAr">Ready</b><span>AR status</span></div>
+        <div class="m"><b id="mAr">Ready</b><span>AR support</span></div>
         <div class="m"><b id="mTotal">0</b><span>In repository</span></div>
       </div>
     </section>
@@ -278,12 +293,25 @@
         <div class="panel-head"><h2><span class="ix">01</span> Deploy asset</h2></div>
         <div class="panel-body">
           <div class="field" style="margin-bottom:14px"><label>Asset name</label><input id="assetName" type="text" placeholder="e.g. Studio Chair v2" /></div>
-          <div class="dropzone" id="dropzone">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></div>
-            <p id="dropText">Click or drag a 3D model</p>
-            <small>.GLB · .GLTF · .USDZ — max 50MB</small>
+
+          <div class="dz-grid">
+            <div class="dropzone" id="dzGlb">
+              <span class="dz-tag">Required</span>
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
+              <p id="glbText">GLB / GLTF model</p>
+              <small id="glbSub">3D viewer + Android AR</small>
+            </div>
+            <div class="dropzone opt" id="dzUsdz">
+              <span class="dz-tag">Optional</span>
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
+              <p id="usdzText">USDZ model</p>
+              <small id="usdzSub">native iPhone / iPad AR</small>
+            </div>
           </div>
-          <input type="file" id="fileInput" accept=".glb,.gltf,.usdz" hidden />
+
+          <input type="file" id="glbInput" accept=".glb,.gltf" hidden />
+          <input type="file" id="usdzInput" accept=".usdz" hidden />
+
           <button class="btn btn-primary btn-block" id="deployBtn" style="margin-top:14px;opacity:.5;pointer-events:none" onclick="deploy()">
             <span class="spin"></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
@@ -308,6 +336,11 @@
   </header>
   <div class="sv-stage">
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+    <div class="stage-empty" id="sharedEmpty">
+      <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
+      <p>AR-only model</p>
+      <small>Tap “View in AR” on an iPhone / iPad to place it in your space.</small>
+    </div>
     <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
     <div class="sv-banner">
       <span class="pill" style="width:fit-content"><span class="dot"></span>SHARED WITH YOU</span>
@@ -324,7 +357,7 @@
   <div class="modal">
     <div class="mhead"><h3>Share &amp; launch AR</h3><button class="closeX" onclick="closeShare()">✕</button></div>
     <div class="mbody">
-      <p style="color:var(--text-2);font-size:14px">Scan with a phone to open <b id="shareName" style="color:var(--text)">this model</b> directly in augmented reality.</p>
+      <p style="color:var(--text-2);font-size:14px">Scan with a phone to open <b id="shareName" style="color:var(--text)">this model</b> in AR. Android uses the GLB, iPhone uses the USDZ automatically.</p>
       <div class="qrbox"><div id="qr"></div></div>
       <div>
         <span class="eyebrow">Public link</span>
@@ -343,7 +376,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const BUCKET = 'models';
 const SAMPLE = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
 
-/* ---- storage adapter that never crashes in sandboxes ---- */
 const memStore = {};
 const safeStorage = {
   getItem:k=>{try{return localStorage.getItem(k)}catch{ return k in memStore?memStore[k]:null }},
@@ -351,13 +383,17 @@ const safeStorage = {
   removeItem:k=>{try{localStorage.removeItem(k)}catch{ delete memStore[k] }}
 };
 
-let sb=null, user=null, assets=[], activeId=null, authMode='login', pendingFile=null;
+let sb=null, user=null, assets=[], activeId=null, authMode='login';
+let pendingGlb=null, pendingUsdz=null;
+
+const isUsdz = u => /\.usdz(\?|$)/i.test(u||'');
 
 /* ===================== INIT ===================== */
 window.addEventListener('DOMContentLoaded', init);
 async function init(){
-  const p = new URLSearchParams(location.search);
-  if(p.get('model')){ showShared(decodeURIComponent(p.get('model')), p.get('name')?decodeURIComponent(p.get('name')):'Shared model'); return; }
+  const p=new URLSearchParams(location.search);
+  const model=p.get('model'), ios=p.get('ios'), nm=p.get('name');
+  if(model||ios){ showShared(model, nm||'Shared model', ios); return; }
 
   if(!window.supabase || !window.supabase.createClient){
     authNote('Supabase library blocked in this preview. Deploy this file to your host (GitHub Pages / Vercel) and it will connect.','err');
@@ -369,7 +405,7 @@ async function init(){
   try{
     const { data:{ session } } = await sb.auth.getSession();
     if(session && session.user){ user=session.user; enterApp(); }
-  }catch(e){ /* not logged in */ }
+  }catch(e){}
 }
 
 /* ===================== AUTH ===================== */
@@ -381,10 +417,7 @@ function setMode(m){
     ? 'ALREADY A MEMBER? <a href="#" onclick="setMode(\'login\');return false" style="color:var(--signal);text-decoration:none">LOG IN →</a>'
     : 'NO ACCOUNT YET? <a href="#" onclick="setMode(\'register\');return false" style="color:var(--signal);text-decoration:none">CREATE ONE →</a>';
 }
-function authNote(msg,type){
-  const el=document.getElementById('authMsg');
-  el.className='auth-msg'+(type?(' '+type):''); el.textContent=msg;
-}
+function authNote(msg,type){ const el=document.getElementById('authMsg'); el.className='auth-msg'+(type?(' '+type):''); el.textContent=msg; }
 function authLoading(on){ document.getElementById('authBtn').classList.toggle('loading',on); }
 
 async function submitAuth(){
@@ -428,18 +461,26 @@ async function loadAssets(){
   try{
     const { data, error } = await sb.from('assets').select('*').order('created_at',{ascending:false});
     if(error) throw error;
-    assets=(data||[]).map(r=>({id:r.id,name:r.name,src:r.url,fmt:r.format,size:r.size,path:r.path}));
+    assets=(data||[]).map(r=>{
+      let src=r.url||null, iosSrc=r.ios_src||null, path=r.path||null, iosPath=r.ios_path||null;
+      // legacy safety: an old asset whose only file was a USDZ -> treat as AR-only
+      if(!iosSrc && isUsdz(src)){ iosSrc=src; iosPath=path; src=null; path=null; }
+      return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath};
+    });
   }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
   renderRepo();
   if(assets[0]) loadAsset(assets[0].id); else showSample();
 }
 function showSample(){
-  const v=document.getElementById('stageViewer'); v.setAttribute('src',SAMPLE); v.setAttribute('auto-rotate','');
+  const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
+  v.style.display=''; empty.style.display='none';
+  v.removeAttribute('ios-src'); v.setAttribute('src',SAMPLE); v.setAttribute('auto-rotate','');
   document.getElementById('nowName').textContent='Sample preview';
   document.getElementById('nowFmt').textContent='DEMO';
   document.getElementById('nowDim').textContent='upload to begin';
   document.getElementById('mFormat').textContent='—';
   document.getElementById('mSize').textContent='—';
+  document.getElementById('mAr').textContent='Ready';
 }
 function renderRepo(){
   const list=document.getElementById('repoList');
@@ -448,8 +489,13 @@ function renderRepo(){
   if(!assets.length){ list.innerHTML='<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to save it to the cloud.</p></div>'; return; }
   list.innerHTML=assets.map(a=>`
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
-      <div class="thumb"><model-viewer src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer></div>
-      <div class="meta"><div class="nm">${esc(a.name)}</div><div class="sub">${a.fmt} · ${a.size}</div></div>
+      <div class="thumb">${a.src
+        ? `<model-viewer src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer>`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>`}</div>
+      <div class="meta">
+        <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</span>${a.iosSrc?'<span class="badge-ios">iOS AR</span>':''}</div>
+        <div class="sub">${a.src?a.fmt:'USDZ'} · ${a.size}</div>
+      </div>
       <div class="acts">
         <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
         <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
@@ -459,22 +505,31 @@ function renderRepo(){
 function loadAsset(id){
   const a=assets.find(x=>x.id===id); if(!a) return;
   activeId=id;
-  const v=document.getElementById('stageViewer');
-  v.setAttribute('src',a.src);
+  const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
+  if(a.src){
+    v.style.display=''; empty.style.display='none';
+    v.setAttribute('src',a.src);
+    document.getElementById('nowDim').textContent='loading…';
+    v.addEventListener('load',()=>document.getElementById('nowDim').textContent='loaded ✓',{once:true});
+  }else{
+    v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
+    document.getElementById('nowDim').textContent='AR-only';
+  }
+  if(a.iosSrc) v.setAttribute('ios-src',a.iosSrc); else v.removeAttribute('ios-src');
+  const fmtLabel = a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ';
   document.getElementById('nowName').textContent=a.name;
-  document.getElementById('nowFmt').textContent=a.fmt;
-  document.getElementById('nowDim').textContent='loading…';
-  document.getElementById('mFormat').textContent=a.fmt;
+  document.getElementById('nowFmt').textContent=fmtLabel;
+  document.getElementById('mFormat').textContent=fmtLabel;
   document.getElementById('mSize').textContent=a.size;
-  document.getElementById('mAr').textContent='Ready';
-  v.addEventListener('load',()=>document.getElementById('nowDim').textContent='loaded ✓',{once:true});
+  document.getElementById('mAr').textContent = a.src&&a.iosSrc ? 'iOS + Android' : (a.iosSrc?'iOS only':'Android/WebXR');
   renderRepo();
 }
 async function delAsset(id){
   const a=assets.find(x=>x.id===id); if(!a) return;
   if(!confirm('Delete "'+a.name+'" permanently?')) return;
   try{
-    if(a.path) await sb.storage.from(BUCKET).remove([a.path]);
+    const paths=[a.path,a.iosPath].filter(Boolean);
+    if(paths.length) await sb.storage.from(BUCKET).remove(paths);
     const { error } = await sb.from('assets').delete().eq('id',id);
     if(error) throw error;
   }catch(e){ toast('Delete failed: '+e.message); return; }
@@ -483,45 +538,73 @@ async function delAsset(id){
   renderRepo(); toast('Asset deleted');
 }
 
-/* ===================== UPLOAD ===================== */
-const dz=document.getElementById('dropzone'), fileInput=document.getElementById('fileInput');
-dz.addEventListener('click',()=>fileInput.click());
-['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add('drag')}));
-['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.remove('drag')}));
-dz.addEventListener('drop',ev=>handleFile(ev.dataTransfer.files[0]));
-fileInput.addEventListener('change',ev=>handleFile(ev.target.files[0]));
-function handleFile(file){
+/* ===================== UPLOAD (GLB required + USDZ optional) ===================== */
+const dzGlb=document.getElementById('dzGlb'), glbInput=document.getElementById('glbInput');
+const dzUsdz=document.getElementById('dzUsdz'), usdzInput=document.getElementById('usdzInput');
+setupDz(dzGlb, glbInput, 'glb');
+setupDz(dzUsdz, usdzInput, 'usdz');
+function setupDz(zone, input, kind){
+  zone.addEventListener('click',()=>input.click());
+  ['dragenter','dragover'].forEach(e=>zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.add('drag')}));
+  ['dragleave','drop'].forEach(e=>zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.remove('drag')}));
+  zone.addEventListener('drop',ev=>pick(kind, ev.dataTransfer.files[0]));
+  input.addEventListener('change',ev=>pick(kind, ev.target.files[0]));
+}
+function pick(kind, file){
   if(!file) return;
-  if(!/\.(glb|gltf|usdz)$/i.test(file.name)){ toast('Only .glb, .gltf or .usdz files'); return; }
-  pendingFile=file; dz.classList.add('has');
-  document.getElementById('dropText').textContent=file.name;
-  const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|usdz)$/i,'');
-  const b=document.getElementById('deployBtn'); b.style.opacity='1'; b.style.pointerEvents='auto';
+  if(kind==='glb'){
+    if(!/\.(glb|gltf)$/i.test(file.name)){ toast('GLB slot accepts .glb or .gltf only'); return; }
+    pendingGlb=file; dzGlb.classList.add('has');
+    document.getElementById('glbText').textContent=file.name;
+    document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
+    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf)$/i,'');
+  }else{
+    if(!/\.usdz$/i.test(file.name)){ toast('USDZ slot accepts .usdz only'); return; }
+    pendingUsdz=file; dzUsdz.classList.add('has');
+    document.getElementById('usdzText').textContent=file.name;
+    document.getElementById('usdzSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
+  }
+  const b=document.getElementById('deployBtn'), on=!!pendingGlb;
+  b.style.opacity=on?'1':'.5'; b.style.pointerEvents=on?'auto':'none';
 }
 function deployLoading(on){ document.getElementById('deployBtn').classList.toggle('loading',on); }
 async function deploy(){
-  if(!pendingFile||!user) return;
-  const name=document.getElementById('assetName').value.trim()||pendingFile.name;
-  const fmt=pendingFile.name.split('.').pop().toUpperCase();
-  const size=(pendingFile.size/1048576).toFixed(1)+' MB';
-  const path=`${user.id}/${Date.now()}-${slug(pendingFile.name)}`;
+  if(!pendingGlb||!user) return;
+  const name=document.getElementById('assetName').value.trim()||pendingGlb.name;
+  const fmt=pendingGlb.name.split('.').pop().toUpperCase();
+  const size=(pendingGlb.size/1048576).toFixed(1)+' MB';
   deployLoading(true);
   try{
-    const up=await sb.storage.from(BUCKET).upload(path,pendingFile,{upsert:false,contentType:pendingFile.type||'model/gltf-binary'});
-    if(up.error) throw up.error;
-    const url=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
-    const ins=await sb.from('assets').insert({user_id:user.id,name,format:fmt,size,path,url}).select().single();
+    const glbPath=`${user.id}/${Date.now()}-${slug(pendingGlb.name)}`;
+    const up1=await sb.storage.from(BUCKET).upload(glbPath, pendingGlb, {upsert:false, contentType:pendingGlb.type||'model/gltf-binary'});
+    if(up1.error) throw up1.error;
+    const url=sb.storage.from(BUCKET).getPublicUrl(glbPath).data.publicUrl;
+
+    let iosSrc=null, iosPath=null;
+    if(pendingUsdz){
+      iosPath=`${user.id}/${Date.now()}-${slug(pendingUsdz.name)}`;
+      const up2=await sb.storage.from(BUCKET).upload(iosPath, pendingUsdz, {upsert:false, contentType:'model/vnd.usdz+zip'});
+      if(up2.error) throw up2.error;
+      iosSrc=sb.storage.from(BUCKET).getPublicUrl(iosPath).data.publicUrl;
+    }
+
+    const ins=await sb.from('assets').insert({user_id:user.id,name,format:fmt,size,path:glbPath,url,ios_src:iosSrc,ios_path:iosPath}).select().single();
     if(ins.error) throw ins.error;
     const r=ins.data;
-    assets.unshift({id:r.id,name:r.name,src:r.url,fmt:r.format,size:r.size,path:r.path});
-    renderRepo(); loadAsset(r.id); resetUpload(); toast('Asset saved to Supabase ✓');
+    assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path});
+    renderRepo(); loadAsset(r.id); resetUpload();
+    toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓');
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
 }
 function resetUpload(){
-  pendingFile=null; dz.classList.remove('has');
-  document.getElementById('dropText').textContent='Click or drag a 3D model';
-  document.getElementById('assetName').value=''; fileInput.value='';
+  pendingGlb=null; pendingUsdz=null;
+  dzGlb.classList.remove('has'); dzUsdz.classList.remove('has');
+  document.getElementById('glbText').textContent='GLB / GLTF model';
+  document.getElementById('glbSub').textContent='3D viewer + Android AR';
+  document.getElementById('usdzText').textContent='USDZ model';
+  document.getElementById('usdzSub').textContent='native iPhone / iPad AR';
+  document.getElementById('assetName').value=''; glbInput.value=''; usdzInput.value='';
   const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
 }
 
@@ -539,7 +622,10 @@ function launchAR(){const v=document.getElementById('stageViewer');if(v.canActiv
 /* ===================== SHARE ===================== */
 function openShare(id){
   const a=assets.find(x=>x.id===(id||activeId)); if(!a){ toast('Load an asset first'); return; }
-  const link=`${location.origin}${location.pathname}?model=${encodeURIComponent(a.src)}&name=${encodeURIComponent(a.name)}`;
+  const params=new URLSearchParams(); params.set('name',a.name);
+  if(a.src) params.set('model',a.src);
+  if(a.iosSrc) params.set('ios',a.iosSrc);
+  const link=`${location.origin}${location.pathname}?${params.toString()}`;
   document.getElementById('shareLink').value=link;
   document.getElementById('shareName').textContent=a.name;
   makeQR(link);
@@ -554,12 +640,15 @@ function makeQR(text){
 }
 
 /* ===================== SHARED PUBLIC VIEW ===================== */
-function showShared(url,name){
+function showShared(url,name,iosUrl){
   document.getElementById('authGate').style.display='none';
   document.getElementById('app').style.display='none';
   document.getElementById('sharedView').style.display='flex';
   document.getElementById('sharedName').textContent=name||'3D model';
-  document.getElementById('sharedViewer').setAttribute('src',url);
+  const v=document.getElementById('sharedViewer'), empty=document.getElementById('sharedEmpty');
+  if(url){ v.style.display=''; empty.style.display='none'; v.setAttribute('src',url); }
+  else { v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex'; }
+  if(iosUrl) v.setAttribute('ios-src',iosUrl); else v.removeAttribute('ios-src');
 }
 function goWorkspace(){ location.href=location.origin+location.pathname; }
 
