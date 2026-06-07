@@ -3,311 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Creartor AR | Workspace</title>
+  <title>AR Asset Library & Share</title>
   
   <style>
-    /* UI/UX REDESIGN: Techie, Dark, Elegant, Glassmorphism HUD */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-    :root { 
-      /* Deep space dark palette */
-      --bg-base: #030508;
-      /* Frosted glass surfaces */
-      --bg-surface: rgba(15, 20, 30, 0.45);
-      --bg-surface-hover: rgba(25, 35, 50, 0.6);
-      /* Techie neon borders */
-      --border-color: rgba(180, 255, 0, 0.15);
-      --border-hover: rgba(180, 255, 0, 0.6);
-      --border-accent: rgba(0, 229, 255, 0.3);
-      /* Typography */
-      --text-main: #e0e6ed;
-      --text-muted: #8b9bb4;
-      /* Brand colors */
-      --primary: #b4ff00; /* Lime green */
-      --primary-invert: #000000;
-      --accent: #00e5ff; /* Cyber blue */
-      --danger: #ff2a5f;
-      --radius: 12px;
-      --glass-blur: blur(16px);
-    }
-
-    body { 
-      font-family: 'Inter', -apple-system, sans-serif; 
-      margin: 0; 
-      padding: 0; 
-      /* Techie background with subtle radial glow */
-      background: radial-gradient(circle at 50% 0%, #0d1b2a 0%, var(--bg-base) 80%);
-      background-attachment: fixed;
-      color: var(--text-main); 
-      -webkit-font-smoothing: antialiased;
-      min-height: 100vh;
-    }
-
-    h1, h2, h3 { font-weight: 600; margin: 0; letter-spacing: 0.5px; }
-    
-    /* Navbar - Floating Glass */
-    .navbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 32px;
-      margin: 16px 24px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border-color);
-      background: var(--bg-surface);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-      position: sticky;
-      top: 16px;
-      z-index: 100;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 700;
-      font-size: 1.2rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--primary);
-      text-shadow: 0 0 10px rgba(180, 255, 0, 0.3);
-    }
-
-    .brand img {
-      height: 28px; 
-      width: auto;
-      border-radius: 4px;
-      filter: drop-shadow(0 0 5px rgba(180, 255, 0, 0.5));
-    }
-
-    .logout-btn { 
-      background: none; border: none; color: var(--text-muted); font-weight: 500; 
-      cursor: pointer; display: none; font-size: 0.9rem; transition: all 0.3s ease;
-      text-transform: uppercase; letter-spacing: 1px;
-    }
-    .logout-btn:hover { color: var(--danger); text-shadow: 0 0 8px rgba(255, 42, 95, 0.5); }
-
-    .container { max-width: 1000px; margin: 40px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 40px; }
-    
-    /* HUD Glass Cards */
-    .section-box { 
-      background: var(--bg-surface); 
-      padding: 32px; 
-      border-radius: var(--radius); 
-      border: 1px solid var(--border-color);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Decorative HUD corner elements */
-    .section-box::before, .section-box::after {
-      content: ''; position: absolute; width: 20px; height: 20px; border: 1px solid transparent; pointer-events: none;
-    }
-    .section-box::before { top: 10px; left: 10px; border-top-color: var(--primary); border-left-color: var(--primary); opacity: 0.5; }
-    .section-box::after { bottom: 10px; right: 10px; border-bottom-color: var(--primary); border-right-color: var(--primary); opacity: 0.5; }
-
-    .section-header { margin-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 16px; }
-    .section-header h2 { font-size: 1.5rem; color: #fff; }
-    .section-header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 8px; font-weight: 300; }
-
-    /* Auth Form Styles */
-    #authContainer { max-width: 420px; margin: 80px auto; padding: 40px; }
-    .auth-tabs { display: flex; gap: 24px; margin-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .auth-tab { padding-bottom: 12px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: 0.3s; position: relative; letter-spacing: 0.5px; }
-    .auth-tab:hover { color: var(--text-main); }
-    .auth-tab.active { color: var(--primary); text-shadow: 0 0 8px rgba(180, 255, 0, 0.3); }
-    .auth-tab.active::after { 
-      content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; 
-      background: var(--primary); box-shadow: 0 0 10px var(--primary); 
-    }
-
-    .input-group { margin-bottom: 24px; }
-    label { display: block; font-weight: 500; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-    
-    input[type="text"], input[type="email"], input[type="password"] { 
-      width: 100%; padding: 14px 16px; border: 1px solid var(--border-accent); border-radius: 8px; 
-      font-size: 14px; background: rgba(0, 0, 0, 0.5); color: #fff; box-sizing: border-box; 
-      transition: all 0.3s ease; font-family: 'Inter', sans-serif;
-    }
-    input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 15px rgba(180, 255, 0, 0.15); background: rgba(0, 0, 0, 0.8); }
-    
-    /* Upload Area */
-    .file-upload-wrapper { position: relative; overflow: hidden; display: block; width: 100%; }
-    .file-upload-wrapper input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; width: 100%; z-index: 10; }
-    .file-upload-btn { 
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; 
-      background: rgba(0, 0, 0, 0.3); color: var(--text-muted); border: 1px dashed var(--border-accent); 
-      padding: 40px 16px; border-radius: var(--radius); font-size: 0.95rem; transition: all 0.3s ease; 
-    }
-    .file-upload-wrapper:hover .file-upload-btn { 
-      border-color: var(--primary); background: rgba(180, 255, 0, 0.05); color: var(--primary);
-      box-shadow: inset 0 0 20px rgba(180, 255, 0, 0.05);
-    }
-    .file-upload-btn svg { transition: stroke 0.3s; }
-    .file-upload-wrapper:hover .file-upload-btn svg { stroke: var(--primary); }
-
-    /* Buttons */
-    button.btn-primary { 
-      background: var(--primary); color: var(--primary-invert); border: 1px solid var(--primary); 
-      padding: 14px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; 
-      width: 100%; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;
-      box-shadow: 0 0 15px rgba(180, 255, 0, 0.3);
-    }
-    button.btn-primary:hover { 
-      background: transparent; color: var(--primary); box-shadow: 0 0 25px rgba(180, 255, 0, 0.4) inset; 
-    }
-    button:disabled { background: rgba(255,255,255,0.1); color: var(--text-muted); border-color: transparent; box-shadow: none; cursor: not-allowed; }
-    
-    /* Library Grid */
-    .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
-    .asset-card { 
-      background: var(--bg-surface); border-radius: var(--radius); padding: 16px; 
-      border: 1px solid var(--border-color); transition: all 0.3s ease; display: flex; flex-direction: column;
-      backdrop-filter: var(--glass-blur);
-    }
-    .asset-card:hover { 
-      border-color: var(--primary); transform: translateY(-5px);
-      box-shadow: 0 10px 30px rgba(180, 255, 0, 0.1);
-    }
-    model-viewer { 
-      width: 100%; height: 240px; background: radial-gradient(circle, rgba(25,35,50,0.8) 0%, rgba(0,0,0,0.8) 100%); 
-      border-radius: 8px; margin-bottom: 20px; outline: none; border: 1px solid rgba(255,255,255,0.05);
-    }
-    .asset-title { font-size: 1rem; font-weight: 500; margin: 0 0 16px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
-    
-    .btn-group { display: flex; gap: 10px; margin-bottom: 0; }
-    .btn-secondary { 
-      background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); 
-      padding: 10px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; flex: 1; font-size: 0.8rem; transition: 0.3s;
-    }
-    .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--text-main); }
-    
-    .btn-danger { 
-      background: transparent; color: var(--danger); border: 1px solid rgba(255, 42, 95, 0.3); 
-      padding: 10px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; width: 100%; font-size: 0.8rem; transition: 0.3s;
-    }
-    .btn-danger:hover { background: rgba(255, 42, 95, 0.1); border-color: var(--danger); box-shadow: 0 0 10px rgba(255, 42, 95, 0.2); }
-
-    /* Status Messages */
-    .status-msg { padding: 12px 16px; border-radius: 8px; font-weight: 500; margin-top: 20px; font-size: 0.85rem; border: 1px solid transparent; letter-spacing: 0.5px; }
-    .success { background: rgba(180, 255, 0, 0.1); color: var(--primary); border-color: var(--primary); }
-    .error { background: rgba(255, 42, 95, 0.1); color: var(--danger); border-color: var(--danger); }
-    .loading { background: rgba(0, 229, 255, 0.1); color: var(--accent); border-color: var(--accent); }
-
-    #appContainer { display: none; }
+    :root { --primary: #007aff; --bg: #f5f5f7; --card-bg: #ffffff; --text: #1d1d1f; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: var(--bg); color: var(--text); }
+    h1, h2, h3 { font-weight: 600; }
+    .container { display: flex; flex-direction: column; gap: 20px; }
+    .section-box { background: var(--card-bg); padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    input[type="text"], input[type="file"] { display: block; width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    button { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; width: 100%; transition: background 0.2s; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 15px; }
+    .asset-card { background: var(--card-bg); border: 1px solid #e5e5ea; padding: 16px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    model-viewer { width: 100%; height: 220px; background-color: #f5f5f7; border-radius: 8px; }
+    .btn-group { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-secondary { background: #e5e5ea; color: #1d1d1f; }
+    .error-msg { background: #ff3b30; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
+    .success-msg { background: #34c759; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
   </style>
+
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
 
-  <nav class="navbar">
-    <div class="brand">
-      <img src="icon-512.png" alt="Logo" onerror="this.style.display='none'"> 
-      <span>Creartor AR</span>
-    </div>
-    <button class="logout-btn" id="logoutBtn" onclick="prosesLogout()">Logout</button>
-  </nav>
+  <div class="container">
+    <h1>AR Asset Viewer & Library</h1>
 
-  <div class="section-box" id="authContainer">
-    <div class="section-header">
-      <h2>Welcome Back</h2>
-      <p>Initiate secure connection to your AR workspace.</p>
-    </div>
-    
-    <div class="auth-tabs">
-      <div class="auth-tab active" id="tabLogin" onclick="setMode('login')">LOGIN</div>
-      <div class="auth-tab" id="tabRegister" onclick="setMode('register')">REGISTER</div>
-    </div>
-    
-    <form id="authForm">
-      <div class="input-group">
-        <label>Email Address</label>
-        <input type="email" id="authEmail" placeholder="operator@creartor.ar" required>
-      </div>
-      <div class="input-group">
-        <label>Security Key</label>
-        <input type="password" id="authPassword" placeholder="••••••••" required minlength="6">
-      </div>
-      <button type="submit" class="btn-primary" id="authSubmitBtn">INITIALIZE</button>
-    </form>
-    <div id="authStatus"></div>
-  </div>
-
-  <div class="container" id="appContainer">
-    
-    <div id="sharedBanner" class="section-box" style="display:none; border-color: var(--accent); box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);">
-      <div class="section-header" style="border-bottom-color: rgba(0, 229, 255, 0.2);">
-        <h2 style="color: var(--accent); text-shadow: 0 0 10px rgba(0, 229, 255, 0.4);">Incoming Transmission</h2>
-        <p>A 3D asset has been securely shared with your workspace.</p>
-      </div>
-      <div id="sharedContent"></div>
+    <div class="section-box">
+      <h3>Upload Aset Baru (.glb / .gltf)</h3>
+      <form id="uploadForm">
+        <input type="text" id="assetName" placeholder="Nama Aset (contoh: Kursi Kayu)" required>
+        <input type="file" id="assetFile" accept=".glb,.gltf" required>
+        <button type="submit" id="submitBtn">Simpan ke Supabase</button>
+      </form>
+      <div id="statusMessage"></div>
     </div>
 
     <div class="section-box">
-      <div class="section-header">
-        <h2>Deploy Asset</h2>
-        <p>Upload a new .glb or .gltf 3D model payload to your repository.</p>
+      <h3>Koleksi Aset Saya</h3>
+      <div id="libraryContainer">
+        <p style="color: #666; font-weight: bold;">Memuat koleksi...</p>
       </div>
-      <form id="uploadForm">
-        <div class="input-group">
-          <label>Asset Designation</label>
-          <input type="text" id="assetName" placeholder="e.g. MK-VII Cyber Suit" required>
-        </div>
-        <div class="input-group">
-          <label>Payload File</label>
-          <div class="file-upload-wrapper">
-            <div class="file-upload-btn">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              <span id="fileNameDisplay">Click to browse or drag file here</span>
-            </div>
-            <input type="file" id="assetFile" accept=".glb,.gltf" required>
-          </div>
-        </div>
-        <button type="submit" class="btn-primary" id="uploadBtn">TRANSMIT ASSET</button>
-      </form>
-      <div id="uploadStatus"></div>
-    </div>
-
-    <div class="section-box" style="border:none; padding: 0; background: transparent; box-shadow: none;">
-      <div class="section-header">
-        <h2>My Repository</h2>
-        <p>Manage and monitor your deployed 3D payloads.</p>
-      </div>
-      <div id="libraryContainer" class="library-grid">
-        </div>
     </div>
   </div>
 
   <script>
+    // Konfigurasi Supabase
     const SUPABASE_URL = 'https://ogmtrdzimqlxhzomnnzl.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
     
-    let userToken = localStorage.getItem('sb_token') || null;
-    let authMode = 'login'; 
+    // Header Wajib untuk Raw API
+    const authHeaders = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    };
 
-    const authContainer = document.getElementById('authContainer');
-    // FIXED: The line below was cut off in your original code. I closed it properly.
-    const appContainer = document.getElementById('appContainer');
+    const libraryContainer = document.getElementById('libraryContainer');
+    const statusMessage = document.getElementById('statusMessage');
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
 
-    // --- Tambahkan logika JavaScript aplikasi Anda (Login, Upload, Fetch Supabase) di bawah sini ---
-    
-    // Contoh script untuk mengganti nama file saat dipilih agar UX upload lebih baik
-    document.getElementById('assetFile').addEventListener('change', function(e) {
-      const fileNameDisplay = document.getElementById('fileNameDisplay');
-      if (this.files && this.files.length > 0) {
-        fileNameDisplay.textContent = "Selected: " + this.files[0].name;
-        fileNameDisplay.style.color = "var(--primary)";
-      } else {
-        fileNameDisplay.textContent = "Click to browse or drag file here";
-        fileNameDisplay.style.color = "var(--text-muted)";
+    // 1. FUNGSI MENGAMBIL DATA (RAW API)
+    async function muatKoleksiAset() {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/user_assets?select=*&order=created_at.desc`, {
+          method: 'GET',
+          headers: authHeaders
+        });
+
+        if (!response.ok) throw new Error(`Gagal memuat database: ${response.statusText}`);
+        
+        const data = await response.json();
+
+        if (data.length === 0) {
+          libraryContainer.innerHTML = '<p style="color:#666;">Belum ada aset. Silakan upload file 3D pertama Anda!</p>';
+          return;
+        }
+
+        let gridHtml = '<div class="library-grid">';
+        data.forEach(asset => {
+          const shareLink = `${window.location.origin}${window.location.pathname}?model=${encodeURIComponent(asset.file_url)}&name=${encodeURIComponent(asset.asset_name)}`;
+          gridHtml += `
+            <div class="asset-card">
+              <h4 style="margin: 0 0 10px 0;">${asset.asset_name}</h4>
+              <model-viewer src="${asset.file_url}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
+              <div class="btn-group">
+                <button onclick="window.open('${asset.file_url}', '_blank')">Detail</button>
+                <button class="btn-secondary" onclick="navigator.clipboard.writeText('${shareLink}').then(()=>alert('Link Share Tersalin!'))">🔗 Share</button>
+              </div>
+            </div>
+          `;
+        });
+        gridHtml += '</div>';
+        libraryContainer.innerHTML = gridHtml;
+
+      } catch (err) {
+        libraryContainer.innerHTML = `<div class="error-msg"><strong>🚨 Error:</strong> ${err.message}</div>`;
+      }
+    }
+
+    // 2. FUNGSI UPLOAD DATA (RAW API)
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('assetFile').files[0];
+      const name = document.getElementById('assetName').value;
+
+      if (!file) return;
+
+      submitBtn.disabled = true;
+      statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">1/2 Mengunggah file ke Storage...</div>';
+
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.floor(Math.random()*1000)}.${fileExt}`;
+        const filePath = `models/${fileName}`;
+
+        // Tahap 1: Upload File Fisik ke Storage
+        const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/ar_assets/${filePath}`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            'Content-Type': file.type || 'application/octet-stream'
+          },
+          body: file
+        });
+
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text();
+          throw new Error(`Gagal upload file: ${errText}`);
+        }
+
+        statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">2/2 Menyimpan data ke Database...</div>';
+        
+        // Buat Link Publik
+        const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/ar_assets/${filePath}`;
+
+        // Tahap 2: Simpan Informasi ke Database
+        const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/user_assets`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ 
+            asset_name: name, 
+            file_url: fileUrl, 
+            file_path: filePath 
+          })
+        });
+
+        if (!dbRes.ok) {
+          const errText = await dbRes.text();
+          throw new Error(`Gagal menyimpan database: ${errText}`);
+        }
+
+        // Berhasil Total!
+        statusMessage.innerHTML = '<div class="success-msg">🎉 Aset Berhasil Diupload & Disimpan!</div>';
+        uploadForm.reset();
+        muatKoleksiAset(); // Refresh gallery
+
+      } catch (err) {
+        statusMessage.innerHTML = `<div class="error-msg"><strong>🚨 Gagal:</strong><br>${err.message}</div>`;
+      } finally {
+        submitBtn.disabled = false;
+        setTimeout(() => { if(statusMessage.innerText.includes('Berhasil')) statusMessage.innerHTML = ''; }, 3000);
       }
     });
 
+    // Mulai aplikasi
+    muatKoleksiAset();
   </script>
 </body>
 </html>
