@@ -5,272 +5,146 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Creartor AR — Spatial Workspace</title>
 
-<!-- Fonts -->
+<!-- ============================================================
+     SETUP (one time): run supabase-setup.sql in your Supabase
+     SQL Editor, create the PUBLIC storage bucket "models",
+     and enable Email auth. Then deploy this file.
+     ============================================================ -->
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
-<!-- Google model-viewer (real 3D + WebAR) -->
+<!-- 3D + WebAR -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- QR code -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
   :root{
-    --bg:#0a0a0c;
-    --bg-2:#0e0e11;
-    --surface:#141418;
-    --surface-2:#1a1a20;
-    --surface-3:#202028;
-    --line:rgba(255,255,255,.08);
-    --line-strong:rgba(255,255,255,.16);
-    --text:#f3f3ef;
-    --text-2:#9a9aa4;
-    --text-3:#62626c;
-    --signal:#cdf24a;
-    --signal-dim:#9bbe2e;
-    --danger:#ff6a5e;
-    --radius:16px;
-    --ease:cubic-bezier(.22,1,.36,1);
+    --bg:#0a0a0c;--bg-2:#0e0e11;--surface:#141418;--surface-2:#1a1a20;--surface-3:#202028;
+    --line:rgba(255,255,255,.08);--line-strong:rgba(255,255,255,.16);
+    --text:#f3f3ef;--text-2:#9a9aa4;--text-3:#62626c;
+    --signal:#cdf24a;--signal-dim:#9bbe2e;--danger:#ff6a5e;
+    --radius:16px;--ease:cubic-bezier(.22,1,.36,1);
   }
-
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font-family:"Hanken Grotesk",sans-serif;
-    -webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
-    min-height:100vh;
-    position:relative;
-  }
+  body{background:var(--bg);color:var(--text);font-family:"Hanken Grotesk",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh;position:relative}
 
-  /* ----- Atmosphere: viewport grid + glow + grain ----- */
-  .bg-grid{
-    position:fixed;inset:0;z-index:0;pointer-events:none;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0);
-    background-size:34px 34px;
-    mask-image:radial-gradient(ellipse 120% 90% at 50% 0%, #000 30%, transparent 80%);
-    opacity:.7;
-  }
-  .bg-glow{
-    position:fixed;z-index:0;pointer-events:none;
-    width:70vw;height:70vw;max-width:900px;max-height:900px;
-    top:-25%;left:50%;transform:translateX(-50%);
-    background:radial-gradient(circle, rgba(205,242,74,.13), transparent 62%);
-    filter:blur(20px);
-  }
-  .bg-noise{
-    position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
+  .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0);background-size:34px 34px;mask-image:radial-gradient(ellipse 120% 90% at 50% 0%, #000 30%, transparent 80%);opacity:.7}
+  .bg-glow{position:fixed;z-index:0;pointer-events:none;width:70vw;height:70vw;max-width:900px;max-height:900px;top:-25%;left:50%;transform:translateX(-50%);background:radial-gradient(circle, rgba(205,242,74,.13), transparent 62%);filter:blur(20px)}
+  .bg-noise{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
-  /* ----- Shared bits ----- */
   .mono{font-family:"Space Mono",monospace}
-  .eyebrow{
-    font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.22em;
-    text-transform:uppercase;color:var(--text-3);
-  }
-  .pill{
-    display:inline-flex;align-items:center;gap:7px;
-    font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.08em;
-    padding:5px 11px;border:1px solid var(--line);border-radius:100px;color:var(--text-2);
-    background:rgba(255,255,255,.02);text-transform:uppercase;
-  }
+  .eyebrow{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-3)}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.08em;padding:5px 11px;border:1px solid var(--line);border-radius:100px;color:var(--text-2);background:rgba(255,255,255,.02);text-transform:uppercase}
   .dot{width:6px;height:6px;border-radius:50%;background:var(--signal);box-shadow:0 0 10px var(--signal)}
   .dot.live{animation:pulse 2s var(--ease) infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:9px;
-    padding:13px 20px;border-radius:11px;font-weight:600;font-size:14px;
-    transition:transform .25s var(--ease), background .25s, box-shadow .25s, border-color .25s;
-    border:1px solid transparent;white-space:nowrap;
-  }
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 20px;border-radius:11px;font-weight:600;font-size:14px;transition:transform .25s var(--ease),background .25s,box-shadow .25s,border-color .25s,opacity .2s;border:1px solid transparent;white-space:nowrap}
   .btn svg{width:17px;height:17px}
-  .btn-primary{background:var(--signal);color:#0a0a0c;}
+  .btn-primary{background:var(--signal);color:#0a0a0c}
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 30px -8px rgba(205,242,74,.55)}
   .btn-ghost{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--text)}
   .btn-ghost:hover{border-color:var(--line-strong);background:rgba(255,255,255,.07);transform:translateY(-2px)}
   .btn-block{width:100%}
+  .btn.loading{pointer-events:none;opacity:.65}
+  .btn.loading .lbl{opacity:.5}
+  .spin{width:15px;height:15px;border:2px solid rgba(0,0,0,.25);border-top-color:#0a0a0c;border-radius:50%;animation:rot .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}
+  .btn-ghost .spin{border-color:rgba(255,255,255,.25);border-top-color:#fff}
+  @keyframes rot{to{transform:rotate(360deg)}}
 
   .logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--text)}
-  .logo .mark{
-    width:34px;height:34px;display:grid;place-items:center;border-radius:9px;
-    background:linear-gradient(145deg,#16161b,#0c0c0f);border:1px solid var(--line-strong);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
-  }
+  .logo .mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,#16161b,#0c0c0f);border:1px solid var(--line-strong);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .logo .mark svg{width:19px;height:19px}
   .logo .word{font-family:"Space Mono",monospace;font-size:14px;letter-spacing:.18em;font-weight:700}
   .logo .word b{color:var(--signal)}
 
-  /* ====================== AUTH GATE ====================== */
-  #authGate{
-    position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;
-    background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent), var(--bg);
-  }
-  .auth-shell{
-    width:min(960px,100%);display:grid;grid-template-columns:1.05fr .95fr;
-    border:1px solid var(--line);border-radius:22px;overflow:hidden;
-    background:linear-gradient(180deg,rgba(255,255,255,.025),transparent);
-    box-shadow:0 40px 120px -40px rgba(0,0,0,.8);
-    animation:rise .8s var(--ease) both;
-  }
-  .auth-aside{
-    position:relative;padding:40px;display:flex;flex-direction:column;justify-content:space-between;
-    background:
-      radial-gradient(circle at 80% 20%, rgba(205,242,74,.10), transparent 55%),
-      linear-gradient(160deg,#101014,#0a0a0c);
-    border-right:1px solid var(--line);overflow:hidden;
-  }
-  .auth-aside .cube{
-    position:absolute;right:-40px;bottom:-30px;width:300px;height:300px;opacity:.5;
-    animation:spin 26s linear infinite;
-  }
+  /* AUTH */
+  #authGate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent), var(--bg)}
+  .auth-shell{width:min(960px,100%);display:grid;grid-template-columns:1.05fr .95fr;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.025),transparent);box-shadow:0 40px 120px -40px rgba(0,0,0,.8);animation:rise .8s var(--ease) both}
+  .auth-aside{position:relative;padding:40px;display:flex;flex-direction:column;justify-content:space-between;background:radial-gradient(circle at 80% 20%, rgba(205,242,74,.10), transparent 55%),linear-gradient(160deg,#101014,#0a0a0c);border-right:1px solid var(--line);overflow:hidden}
+  .auth-aside .cube{position:absolute;right:-40px;bottom:-30px;width:300px;height:300px;opacity:.5;animation:spin 26s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .auth-aside h1{
-    font-family:"Syne",sans-serif;font-weight:800;font-size:clamp(30px,4vw,42px);
-    line-height:1.02;letter-spacing:-.02em;margin-top:26px;position:relative;
-  }
+  .auth-aside h1{font-family:"Syne",sans-serif;font-weight:800;font-size:clamp(30px,4vw,42px);line-height:1.02;letter-spacing:-.02em;margin-top:26px;position:relative}
   .auth-aside h1 em{font-style:normal;color:var(--signal)}
   .auth-aside p{color:var(--text-2);max-width:34ch;margin-top:14px;font-size:14px;position:relative}
   .auth-feats{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:2}
-
   .auth-main{padding:40px;background:var(--surface)}
   .auth-tabs{display:flex;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;margin-bottom:26px}
   .auth-tab{flex:1;padding:11px;border-radius:9px;font-weight:600;font-size:14px;color:var(--text-2);transition:.25s var(--ease)}
   .auth-tab.active{background:var(--surface-3);color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.3)}
-
   .field{margin-bottom:16px}
   .field label{display:block;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px}
-  .field input{
-    width:100%;padding:14px 15px;border-radius:11px;background:var(--bg);color:var(--text);
-    border:1px solid var(--line);font-size:15px;font-family:inherit;transition:.2s;
-  }
+  .field input{width:100%;padding:14px 15px;border-radius:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);font-size:15px;font-family:inherit;transition:.2s}
   .field input::placeholder{color:var(--text-3)}
   .field input:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px rgba(205,242,74,.13)}
   .auth-foot{margin-top:18px;text-align:center;color:var(--text-3);font-size:13px}
+  .auth-msg{margin-top:14px;font-size:12.5px;font-family:"Space Mono",monospace;letter-spacing:.04em;padding:10px 12px;border-radius:9px;display:none}
+  .auth-msg.err{display:block;color:var(--danger);background:rgba(255,106,94,.08);border:1px solid rgba(255,106,94,.25)}
+  .auth-msg.ok{display:block;color:var(--signal);background:rgba(205,242,74,.07);border:1px solid rgba(205,242,74,.25)}
 
-  /* ====================== APP ====================== */
+  /* APP */
   #app{position:relative;z-index:2;display:none;min-height:100vh;flex-direction:column}
-  header.bar{
-    position:sticky;top:0;z-index:20;
-    display:flex;align-items:center;justify-content:space-between;gap:16px;
-    padding:16px clamp(16px,4vw,40px);
-    border-bottom:1px solid var(--line);
-    background:rgba(10,10,12,.7);backdrop-filter:blur(16px);
-  }
+  header.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px clamp(16px,4vw,40px);border-bottom:1px solid var(--line);background:rgba(10,10,12,.7);backdrop-filter:blur(16px)}
   .bar-right{display:flex;align-items:center;gap:12px}
-  .avatar{
-    width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
-    background:var(--signal);color:#0a0a0c;font-family:"Space Mono",monospace;font-weight:700;font-size:13px;
-  }
-
-  main{
-    flex:1;display:grid;grid-template-columns:1.55fr .95fr;gap:20px;
-    padding:clamp(16px,3vw,28px) clamp(16px,4vw,40px) 40px;
-    align-items:start;
-  }
+  .avatar{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--signal);color:#0a0a0c;font-family:"Space Mono",monospace;font-weight:700;font-size:13px}
+  main{flex:1;display:grid;grid-template-columns:1.55fr .95fr;gap:20px;padding:clamp(16px,3vw,28px) clamp(16px,4vw,40px) 40px;align-items:start}
   .stagewrap{animation:rise .7s var(--ease) both}
-  .panel{
-    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    animation:rise .7s var(--ease) both;
-  }
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);animation:rise .7s var(--ease) both}
   @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 
-  /* Stage / viewport */
-  .stage{
-    position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;
-    background:
-      radial-gradient(circle at 50% 120%, rgba(205,242,74,.10), transparent 55%),
-      radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0) ,
-      linear-gradient(180deg,#101014,#0b0b0e);
-    background-size:auto,28px 28px,auto;
-    aspect-ratio:1/1;
-    min-height:420px;
-  }
+  .stage{position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.10), transparent 55%),radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0),linear-gradient(180deg,#101014,#0b0b0e);background-size:auto,28px 28px,auto;aspect-ratio:1/1;min-height:420px}
   model-viewer{width:100%;height:100%;background:transparent;--poster-color:transparent}
   #stageViewer{position:absolute;inset:0}
-
   .hud{position:absolute;inset:0;pointer-events:none;padding:18px;display:flex;flex-direction:column;justify-content:space-between}
   .hud .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .hud .now{
-    pointer-events:auto;display:flex;flex-direction:column;gap:6px;max-width:70%;
-  }
+  .hud .now{pointer-events:auto;display:flex;flex-direction:column;gap:6px;max-width:70%}
   .hud .now .name{font-family:"Syne",sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em}
   .hud .chips{display:flex;gap:6px;flex-wrap:wrap}
-  .chip{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-    padding:4px 9px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:var(--text-2)}
+  .chip{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:var(--text-2)}
   .chip.sig{color:var(--signal);border-color:rgba(205,242,74,.35)}
-
-  /* corner crop marks */
   .crop{position:absolute;width:16px;height:16px;border:1.5px solid rgba(255,255,255,.22)}
-  .crop.tl{top:14px;left:14px;border-right:none;border-bottom:none}
-  .crop.tr{top:14px;right:14px;border-left:none;border-bottom:none}
-  .crop.bl{bottom:14px;left:14px;border-right:none;border-top:none}
-  .crop.br{bottom:14px;right:14px;border-left:none;border-top:none}
-
-  .toolbar{
-    pointer-events:auto;align-self:center;display:flex;gap:4px;padding:6px;
-    background:rgba(12,12,15,.78);backdrop-filter:blur(14px);
-    border:1px solid var(--line-strong);border-radius:14px;box-shadow:0 16px 40px -16px rgba(0,0,0,.7)
-  }
-  .tool{
-    width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:var(--text-2);
-    transition:.2s var(--ease);position:relative
-  }
+  .crop.tl{top:14px;left:14px;border-right:none;border-bottom:none}.crop.tr{top:14px;right:14px;border-left:none;border-bottom:none}
+  .crop.bl{bottom:14px;left:14px;border-right:none;border-top:none}.crop.br{bottom:14px;right:14px;border-left:none;border-top:none}
+  .toolbar{pointer-events:auto;align-self:center;display:flex;gap:4px;padding:6px;background:rgba(12,12,15,.78);backdrop-filter:blur(14px);border:1px solid var(--line-strong);border-radius:14px;box-shadow:0 16px 40px -16px rgba(0,0,0,.7)}
+  .tool{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:var(--text-2);transition:.2s var(--ease)}
   .tool svg{width:18px;height:18px}
   .tool:hover{background:rgba(255,255,255,.08);color:var(--text)}
   .tool.active{background:var(--signal);color:#0a0a0c}
-  .tool.ar{width:auto;padding:0 16px;gap:8px;font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.1em;
-    background:var(--signal);color:#0a0a0c}
+  .tool.ar{width:auto;padding:0 16px;gap:8px;font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.1em;background:var(--signal);color:#0a0a0c}
   .tool.ar:hover{filter:brightness(1.05)}
-
   .stage-meta{display:flex;gap:18px;flex-wrap:wrap;padding:16px 4px 0;color:var(--text-3)}
   .stage-meta .m{display:flex;flex-direction:column;gap:3px}
   .stage-meta .m b{font-family:"Space Mono",monospace;font-size:13px;color:var(--text);font-weight:700}
   .stage-meta .m span{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
 
-  /* Side rail */
   .rail{display:flex;flex-direction:column;gap:20px}
   .panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
   .panel-head h2{font-family:"Syne",sans-serif;font-size:16px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
   .panel-head h2 .ix{font-family:"Space Mono",monospace;font-size:11px;color:var(--signal);font-weight:700}
   .panel-body{padding:20px}
-
-  /* Upload */
-  .dropzone{
-    border:1.5px dashed var(--line-strong);border-radius:13px;padding:26px 18px;text-align:center;
-    transition:.25s var(--ease);cursor:pointer;background:rgba(255,255,255,.015);position:relative;overflow:hidden
-  }
+  .dropzone{border:1.5px dashed var(--line-strong);border-radius:13px;padding:26px 18px;text-align:center;transition:.25s var(--ease);cursor:pointer;background:rgba(255,255,255,.015);position:relative;overflow:hidden}
   .dropzone:hover{border-color:var(--signal);background:rgba(205,242,74,.04)}
   .dropzone.drag{border-color:var(--signal);background:rgba(205,242,74,.09);transform:scale(1.01)}
-  .dropzone .ic{
-    width:48px;height:48px;margin:0 auto 12px;border-radius:12px;display:grid;place-items:center;
-    background:var(--surface-3);border:1px solid var(--line);color:var(--signal)
-  }
+  .dropzone .ic{width:48px;height:48px;margin:0 auto 12px;border-radius:12px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line);color:var(--signal)}
   .dropzone .ic svg{width:22px;height:22px}
   .dropzone p{font-weight:600;font-size:14px}
   .dropzone small{display:block;margin-top:5px;color:var(--text-3);font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em}
   .dropzone.has p{color:var(--signal)}
-
-  /* Repository */
   .repo-list{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding-right:4px}
-  .repo-list::-webkit-scrollbar{width:6px}
-  .repo-list::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px}
-  .asset{
-    display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;
-    border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden
-  }
+  .repo-list::-webkit-scrollbar{width:6px}.repo-list::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px}
+  .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden}
   .asset:hover{border-color:var(--line-strong);transform:translateX(2px)}
   .asset.active{border-color:rgba(205,242,74,.5);background:rgba(205,242,74,.05)}
   .asset.active::before{content:"";position:absolute;left:0;top:14%;bottom:14%;width:3px;border-radius:3px;background:var(--signal)}
-  .thumb{
-    width:58px;height:58px;border-radius:10px;flex-shrink:0;overflow:hidden;position:relative;
-    background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.18), transparent 60%),linear-gradient(160deg,#16161c,#0c0c10);
-    border:1px solid var(--line);display:grid;place-items:center
-  }
+  .thumb{width:58px;height:58px;border-radius:10px;flex-shrink:0;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.18), transparent 60%),linear-gradient(160deg,#16161c,#0c0c10);border:1px solid var(--line);display:grid;place-items:center}
   .thumb svg{width:26px;height:26px;color:var(--text-3)}
   .thumb model-viewer{position:absolute;inset:0}
   .asset .meta{flex:1;min-width:0}
@@ -282,52 +156,36 @@
   .iconbtn svg{width:15px;height:15px}
   .iconbtn:hover{background:var(--surface-3);color:var(--text)}
   .iconbtn.del:hover{color:var(--danger)}
-
   .empty{text-align:center;padding:30px 10px;color:var(--text-3)}
   .empty .mono{font-size:11px;letter-spacing:.1em}
 
-  /* ====== Share modal ====== */
-  .overlay{
-    position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:24px;
-    background:rgba(5,5,7,.7);backdrop-filter:blur(6px)
-  }
+  /* modal */
+  .overlay{position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:24px;background:rgba(5,5,7,.7);backdrop-filter:blur(6px)}
   .overlay.show{display:grid;animation:fade .3s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
-  .modal{
-    width:min(440px,100%);background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;
-    overflow:hidden;animation:rise .4s var(--ease) both;box-shadow:0 40px 100px -30px rgba(0,0,0,.8)
-  }
+  .modal{width:min(440px,100%);background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;overflow:hidden;animation:rise .4s var(--ease) both;box-shadow:0 40px 100px -30px rgba(0,0,0,.8)}
   .modal .mhead{padding:22px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
   .modal .mhead h3{font-family:"Syne",sans-serif;font-size:18px;font-weight:700}
   .modal .mbody{padding:24px;display:flex;flex-direction:column;gap:18px}
-  .qr{width:150px;height:150px;margin:0 auto;border-radius:14px;background:#fff;padding:12px;display:grid;place-items:center}
-  .qr canvas{width:100%;height:100%;image-rendering:pixelated}
+  .qrbox{width:174px;height:174px;margin:0 auto;border-radius:14px;background:#fff;padding:12px;display:grid;place-items:center}
+  .qrbox img,.qrbox canvas{width:150px!important;height:150px!important}
   .linkrow{display:flex;gap:8px}
   .linkrow input{flex:1;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);color:var(--text-2);font-family:"Space Mono",monospace;font-size:12px}
   .closeX{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line)}
   .closeX:hover{color:var(--text);background:var(--surface-3)}
 
-  /* toast */
-  #toast{
-    position:fixed;left:50%;bottom:28px;transform:translate(-50%,140%);z-index:80;
-    background:var(--surface-3);border:1px solid var(--line-strong);color:var(--text);
-    padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;
-    display:flex;align-items:center;gap:10px;transition:transform .45s var(--ease);box-shadow:0 20px 50px -20px rgba(0,0,0,.8)
-  }
-  #toast.show{transform:translate(-50%,0)}
-  #toast .dot{background:var(--signal)}
+  /* shared public view */
+  #sharedView{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent),var(--bg)}
+  #sharedView header{display:flex;align-items:center;justify-content:space-between;padding:18px clamp(16px,4vw,40px);border-bottom:1px solid var(--line)}
+  #sharedView .sv-stage{flex:1;position:relative;margin:clamp(16px,3vw,28px);border:1px solid var(--line);border-radius:20px;overflow:hidden;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.10), transparent 55%),radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0),linear-gradient(180deg,#101014,#0b0b0e);background-size:auto,28px 28px,auto}
+  #sharedView .sv-banner{position:absolute;top:18px;left:18px;display:flex;flex-direction:column;gap:6px}
+  #sharedView .sv-banner .nm{font-family:"Syne";font-weight:700;font-size:20px}
 
-  /* responsive */
-  @media(max-width:920px){
-    main{grid-template-columns:1fr}
-    .auth-shell{grid-template-columns:1fr}
-    .auth-aside{min-height:200px;order:-1}
-    .auth-aside .cube{width:200px;opacity:.35}
-  }
-  @media(max-width:480px){
-    .auth-main,.auth-aside{padding:28px}
-    .toolbar{flex-wrap:wrap;justify-content:center}
-  }
+  #toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,140%);z-index:80;background:var(--surface-3);border:1px solid var(--line-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;transition:transform .45s var(--ease);box-shadow:0 20px 50px -20px rgba(0,0,0,.8);max-width:90vw}
+  #toast.show{transform:translate(-50%,0)}
+
+  @media(max-width:920px){main{grid-template-columns:1fr}.auth-shell{grid-template-columns:1fr}.auth-aside{min-height:200px;order:-1}.auth-aside .cube{width:200px;opacity:.35}}
+  @media(max-width:480px){.auth-main,.auth-aside{padding:28px}.toolbar{flex-wrap:wrap;justify-content:center}}
 </style>
 </head>
 <body>
@@ -336,7 +194,7 @@
 <div class="bg-grid"></div>
 <div class="bg-noise"></div>
 
-<!-- =================== AUTH GATE =================== -->
+<!-- =================== AUTH =================== -->
 <div id="authGate">
   <div class="auth-shell">
     <div class="auth-aside">
@@ -345,50 +203,28 @@
         <path d="M100 20 L100 100 M100 100 L170 60 M100 100 L30 60 M100 100 L100 180"/>
         <path d="M30 60 L100 20 L170 60 L100 100 Z" stroke="rgba(205,242,74,.7)"/>
       </svg>
-      <a class="logo" href="#"><span class="mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg>
-      </span><span class="word">CREARTOR<b>·AR</b></span></a>
-
+      <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CREARTOR<b>·AR</b></span></a>
       <div>
         <h1>Build, view &amp;<br/>share in <em>spatial 3D.</em></h1>
-        <p>Your workspace for deploying GLB / USDZ assets and launching them straight into augmented reality.</p>
+        <p>Upload GLB / GLTF / USDZ assets to your cloud repository and launch them straight into augmented reality.</p>
       </div>
-
-      <div class="auth-feats">
-        <span class="pill">GLB</span>
-        <span class="pill">GLTF</span>
-        <span class="pill">USDZ</span>
-        <span class="pill"><span class="dot"></span>WEBXR</span>
-      </div>
+      <div class="auth-feats"><span class="pill">GLB</span><span class="pill">GLTF</span><span class="pill">USDZ</span><span class="pill"><span class="dot"></span>WEBXR</span></div>
     </div>
 
     <div class="auth-main">
       <span class="eyebrow">Workspace access</span>
       <h2 style="font-family:'Syne';font-size:24px;font-weight:800;margin:8px 0 22px;letter-spacing:-.02em">Welcome back</h2>
-
       <div class="auth-tabs">
         <button class="auth-tab active" data-mode="login" onclick="setMode('login')">Login</button>
         <button class="auth-tab" data-mode="register" onclick="setMode('register')">Register</button>
       </div>
-
-      <div class="field">
-        <label>Email address</label>
-        <input id="email" type="email" placeholder="you@studio.com" />
-      </div>
-      <div class="field" id="nameField" style="display:none">
-        <label>Studio name</label>
-        <input id="studio" type="text" placeholder="Your creative studio" />
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input id="password" type="password" placeholder="••••••••••" />
-      </div>
-
-      <button class="btn btn-primary btn-block" onclick="login()" style="margin-top:6px">
-        <span id="authBtnText">Continue</span>
+      <div class="field"><label>Email address</label><input id="email" type="email" placeholder="you@studio.com" autocomplete="email" /></div>
+      <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••••" autocomplete="current-password" /></div>
+      <button class="btn btn-primary btn-block" id="authBtn" onclick="submitAuth()" style="margin-top:6px">
+        <span class="spin"></span><span class="lbl" id="authBtnText">Continue</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
-
+      <div class="auth-msg" id="authMsg"></div>
       <p class="auth-foot mono" id="authFoot">NO ACCOUNT YET? <a href="#" onclick="setMode('register');return false" style="color:var(--signal);text-decoration:none">CREATE ONE →</a></p>
     </div>
   </div>
@@ -397,66 +233,38 @@
 <!-- =================== APP =================== -->
 <div id="app">
   <header class="bar">
-    <a class="logo" href="#"><span class="mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg>
-    </span><span class="word">CREARTOR<b>·AR</b></span></a>
-
+    <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CREARTOR<b>·AR</b></span></a>
     <div class="bar-right">
-      <span class="pill"><span class="dot live"></span>Live workspace</span>
+      <span class="pill"><span class="dot live"></span><span id="userEmail">workspace</span></span>
       <div class="avatar" id="avatar">AR</div>
       <button class="btn btn-ghost" onclick="logout()" style="padding:9px 14px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        Logout
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Logout
       </button>
     </div>
   </header>
 
   <main>
-    <!-- STAGE -->
     <section class="stagewrap">
       <div class="stage">
-        <model-viewer id="stageViewer"
-          camera-controls touch-action="pan-y"
-          shadow-intensity="1.1" exposure="1.05"
-          ar ar-modes="webxr scene-viewer quick-look"
-          interaction-prompt="none"></model-viewer>
-
-        <span class="crop tl"></span><span class="crop tr"></span>
-        <span class="crop bl"></span><span class="crop br"></span>
-
+        <model-viewer id="stageViewer" camera-controls touch-action="pan-y" shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
         <div class="hud">
           <div class="top">
             <div class="now">
               <div class="name" id="nowName">No asset loaded</div>
-              <div class="chips">
-                <span class="chip sig" id="nowFmt">— —</span>
-                <span class="chip" id="nowDim">ready</span>
-              </div>
+              <div class="chips"><span class="chip sig" id="nowFmt">— —</span><span class="chip" id="nowDim">ready</span></div>
             </div>
             <span class="chip">⊹ VIEWPORT 01</span>
           </div>
-
           <div class="toolbar">
-            <button class="tool active" id="rotBtn" title="Auto-rotate" onclick="toggleRotate()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/></svg>
-            </button>
-            <button class="tool" title="Reset camera" onclick="resetCam()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-            </button>
-            <button class="tool" title="Fullscreen" onclick="fullscreen()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-            </button>
-            <button class="tool ar" title="View in AR" onclick="launchAR()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>
-              AR
-            </button>
-            <button class="tool" title="Share" onclick="openShare()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-            </button>
+            <button class="tool active" id="rotBtn" title="Auto-rotate" onclick="toggleRotate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+            <button class="tool" title="Reset camera" onclick="resetCam()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+            <button class="tool" title="Fullscreen" onclick="fullscreen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+            <button class="tool ar" title="View in AR" onclick="launchAR()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>AR</button>
+            <button class="tool" title="Share" onclick="openShare()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
           </div>
         </div>
       </div>
-
       <div class="stage-meta">
         <div class="m"><b id="mFormat">—</b><span>Format</span></div>
         <div class="m"><b id="mSize">—</b><span>File size</span></div>
@@ -465,61 +273,62 @@
       </div>
     </section>
 
-    <!-- RAIL -->
     <aside class="rail">
-      <!-- Upload -->
       <div class="panel" style="animation-delay:.08s">
         <div class="panel-head"><h2><span class="ix">01</span> Deploy asset</h2></div>
         <div class="panel-body">
-          <div class="field" style="margin-bottom:14px">
-            <label>Asset name</label>
-            <input id="assetName" type="text" placeholder="e.g. Studio Chair v2" />
-          </div>
+          <div class="field" style="margin-bottom:14px"><label>Asset name</label><input id="assetName" type="text" placeholder="e.g. Studio Chair v2" /></div>
           <div class="dropzone" id="dropzone">
-            <div class="ic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-            </div>
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></div>
             <p id="dropText">Click or drag a 3D model</p>
             <small>.GLB · .GLTF · .USDZ — max 50MB</small>
           </div>
           <input type="file" id="fileInput" accept=".glb,.gltf,.usdz" hidden />
           <button class="btn btn-primary btn-block" id="deployBtn" style="margin-top:14px;opacity:.5;pointer-events:none" onclick="deploy()">
+            <span class="spin"></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
-            Deploy to repository
+            <span class="lbl">Deploy to repository</span>
           </button>
         </div>
       </div>
 
-      <!-- Repository -->
       <div class="panel" style="animation-delay:.16s">
-        <div class="panel-head">
-          <h2><span class="ix">02</span> My repository</h2>
-          <span class="pill" id="repoCount">0 assets</span>
-        </div>
-        <div class="panel-body">
-          <div class="repo-list" id="repoList"></div>
-        </div>
+        <div class="panel-head"><h2><span class="ix">02</span> My repository</h2><span class="pill" id="repoCount">0 assets</span></div>
+        <div class="panel-body"><div class="repo-list" id="repoList"></div></div>
       </div>
     </aside>
   </main>
 </div>
 
+<!-- =================== SHARED PUBLIC VIEW =================== -->
+<div id="sharedView">
+  <header>
+    <a class="logo" href="#" onclick="goWorkspace();return false"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CREARTOR<b>·AR</b></span></a>
+    <button class="btn btn-ghost" onclick="goWorkspace()" style="padding:9px 16px">Open workspace →</button>
+  </header>
+  <div class="sv-stage">
+    <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+    <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
+    <div class="sv-banner">
+      <span class="pill" style="width:fit-content"><span class="dot"></span>SHARED WITH YOU</span>
+      <span class="nm" id="sharedName">3D model</span>
+    </div>
+    <div class="hud"><div></div><div class="toolbar">
+      <button class="tool ar" onclick="document.getElementById('sharedViewer').activateAR?.()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>VIEW IN AR</button>
+    </div></div>
+  </div>
+</div>
+
 <!-- Share modal -->
 <div class="overlay" id="shareModal">
   <div class="modal">
-    <div class="mhead">
-      <h3>Share &amp; launch AR</h3>
-      <button class="closeX" onclick="closeShare()">✕</button>
-    </div>
+    <div class="mhead"><h3>Share &amp; launch AR</h3><button class="closeX" onclick="closeShare()">✕</button></div>
     <div class="mbody">
       <p style="color:var(--text-2);font-size:14px">Scan with a phone to open <b id="shareName" style="color:var(--text)">this model</b> directly in augmented reality.</p>
-      <div class="qr"><canvas id="qr" width="22" height="22"></canvas></div>
+      <div class="qrbox"><div id="qr"></div></div>
       <div>
         <span class="eyebrow">Public link</span>
-        <div class="linkrow" style="margin-top:8px">
-          <input id="shareLink" readonly />
-          <button class="btn btn-primary" onclick="copyLink()">Copy</button>
-        </div>
+        <div class="linkrow" style="margin-top:8px"><input id="shareLink" readonly /><button class="btn btn-primary" onclick="copyLink()">Copy</button></div>
       </div>
     </div>
   </div>
@@ -528,207 +337,240 @@
 <div id="toast"><span class="dot"></span><span id="toastMsg">Done</span></div>
 
 <script>
-/* ---------------- State ---------------- */
-const SAMPLE = "https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/";
-let assets = [];
-let activeId = null;
-let authMode = 'login';
+/* ===================== CONFIG ===================== */
+const SUPABASE_URL = 'https://ogmtrdzimqlxhzomnnzl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
+const BUCKET = 'models';
+const SAMPLE = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
 
-const seed = [
-  { name:"Astronaut",     src:"https://modelviewer.dev/shared-assets/models/Astronaut.glb",       fmt:"GLB",  size:"1.2 MB" },
-  { name:"Expressive Bot",src:"https://modelviewer.dev/shared-assets/models/RobotExpressive.glb", fmt:"GLB",  size:"3.4 MB" },
-  { name:"Neil's Horse",  src:"https://modelviewer.dev/shared-assets/models/Horse.glb",            fmt:"GLTF", size:"0.8 MB" },
-];
+/* ---- storage adapter that never crashes in sandboxes ---- */
+const memStore = {};
+const safeStorage = {
+  getItem:k=>{try{return localStorage.getItem(k)}catch{ return k in memStore?memStore[k]:null }},
+  setItem:(k,v)=>{try{localStorage.setItem(k,v)}catch{ memStore[k]=v }},
+  removeItem:k=>{try{localStorage.removeItem(k)}catch{ delete memStore[k] }}
+};
 
-/* ---------------- Auth ---------------- */
+let sb=null, user=null, assets=[], activeId=null, authMode='login', pendingFile=null;
+
+/* ===================== INIT ===================== */
+window.addEventListener('DOMContentLoaded', init);
+async function init(){
+  const p = new URLSearchParams(location.search);
+  if(p.get('model')){ showShared(decodeURIComponent(p.get('model')), p.get('name')?decodeURIComponent(p.get('name')):'Shared model'); return; }
+
+  if(!window.supabase || !window.supabase.createClient){
+    authNote('Supabase library blocked in this preview. Deploy this file to your host (GitHub Pages / Vercel) and it will connect.','err');
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth:{ storage:safeStorage, persistSession:true, autoRefreshToken:true, detectSessionInUrl:false }
+  });
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session && session.user){ user=session.user; enterApp(); }
+  }catch(e){ /* not logged in */ }
+}
+
+/* ===================== AUTH ===================== */
 function setMode(m){
-  authMode = m;
+  authMode=m; authNote('','');
   document.querySelectorAll('.auth-tab').forEach(t=>t.classList.toggle('active', t.dataset.mode===m));
-  document.getElementById('nameField').style.display = m==='register'?'block':'none';
   document.getElementById('authBtnText').textContent = m==='register'?'Create workspace':'Continue';
   document.getElementById('authFoot').innerHTML = m==='register'
     ? 'ALREADY A MEMBER? <a href="#" onclick="setMode(\'login\');return false" style="color:var(--signal);text-decoration:none">LOG IN →</a>'
     : 'NO ACCOUNT YET? <a href="#" onclick="setMode(\'register\');return false" style="color:var(--signal);text-decoration:none">CREATE ONE →</a>';
 }
-function login(){
-  const email = document.getElementById('email').value.trim();
-  if(!email){ toast('Enter your email to continue'); return; }
-  const initials = (email[0]||'A').toUpperCase() + (email[1]||'R').toUpperCase();
-  document.getElementById('avatar').textContent = initials;
-  document.getElementById('authGate').style.display='none';
-  document.getElementById('app').style.display='flex';
-  bootRepository();
+function authNote(msg,type){
+  const el=document.getElementById('authMsg');
+  el.className='auth-msg'+(type?(' '+type):''); el.textContent=msg;
 }
-function logout(){
+function authLoading(on){ document.getElementById('authBtn').classList.toggle('loading',on); }
+
+async function submitAuth(){
+  if(!sb){ authNote('Not connected to Supabase yet.','err'); return; }
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  if(!email||!password){ authNote('Email and password are required.','err'); return; }
+  authNote('',''); authLoading(true);
+  try{
+    if(authMode==='register'){
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if(error) throw error;
+      if(!data.session){ authNote('Account created. Check your email to confirm, then log in.','ok'); setMode('login'); authLoading(false); return; }
+      user=data.user;
+    }else{
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+      user=data.user;
+    }
+    enterApp();
+  }catch(e){ authNote(e.message||'Authentication failed.','err'); }
+  authLoading(false);
+}
+async function logout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  user=null; assets=[]; activeId=null;
   document.getElementById('app').style.display='none';
   document.getElementById('authGate').style.display='grid';
 }
-
-/* ---------------- Repository ---------------- */
-function bootRepository(){
-  if(assets.length) return;
-  seed.forEach(s=>assets.push({id:uid(), ...s}));
-  renderRepo();
-  if(assets[0]) loadAsset(assets[0].id);
+function enterApp(){
+  const em=user.email||'workspace';
+  document.getElementById('userEmail').textContent=em;
+  document.getElementById('avatar').textContent=((em[0]||'A')+(em[1]||'R')).toUpperCase();
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('app').style.display='flex';
+  loadAssets();
 }
-function uid(){ return Math.random().toString(36).slice(2,8); }
 
+/* ===================== REPOSITORY ===================== */
+async function loadAssets(){
+  try{
+    const { data, error } = await sb.from('assets').select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    assets=(data||[]).map(r=>({id:r.id,name:r.name,src:r.url,fmt:r.format,size:r.size,path:r.path}));
+  }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
+  renderRepo();
+  if(assets[0]) loadAsset(assets[0].id); else showSample();
+}
+function showSample(){
+  const v=document.getElementById('stageViewer'); v.setAttribute('src',SAMPLE); v.setAttribute('auto-rotate','');
+  document.getElementById('nowName').textContent='Sample preview';
+  document.getElementById('nowFmt').textContent='DEMO';
+  document.getElementById('nowDim').textContent='upload to begin';
+  document.getElementById('mFormat').textContent='—';
+  document.getElementById('mSize').textContent='—';
+}
 function renderRepo(){
-  const list = document.getElementById('repoList');
-  document.getElementById('repoCount').textContent = assets.length + (assets.length===1?' asset':' assets');
-  document.getElementById('mTotal').textContent = assets.length;
-
-  if(!assets.length){
-    list.innerHTML = '<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to get started.</p></div>';
-    return;
-  }
-  list.innerHTML = assets.map(a=>`
+  const list=document.getElementById('repoList');
+  document.getElementById('repoCount').textContent=assets.length+(assets.length===1?' asset':' assets');
+  document.getElementById('mTotal').textContent=assets.length;
+  if(!assets.length){ list.innerHTML='<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to save it to the cloud.</p></div>'; return; }
+  list.innerHTML=assets.map(a=>`
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
-      <div class="thumb">
-        <model-viewer src="${a.src}" disable-zoom interaction-prompt="none"
-          camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer>
-      </div>
-      <div class="meta">
-        <div class="nm">${escapeHtml(a.name)}</div>
-        <div class="sub">${a.fmt} · ${a.size}</div>
-      </div>
+      <div class="thumb"><model-viewer src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer></div>
+      <div class="meta"><div class="nm">${esc(a.name)}</div><div class="sub">${a.fmt} · ${a.size}</div></div>
       <div class="acts">
-        <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-        </button>
-        <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
+        <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+        <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
       </div>
     </div>`).join('');
 }
-
 function loadAsset(id){
-  const a = assets.find(x=>x.id===id); if(!a) return;
-  activeId = id;
-  const v = document.getElementById('stageViewer');
-  v.setAttribute('src', a.src);
-  document.getElementById('nowName').textContent = a.name;
-  document.getElementById('nowFmt').textContent = a.fmt;
-  document.getElementById('nowDim').textContent = 'loading…';
-  document.getElementById('mFormat').textContent = a.fmt;
-  document.getElementById('mSize').textContent = a.size;
-  document.getElementById('mAr').textContent = 'Ready';
-  v.addEventListener('load', ()=>{ document.getElementById('nowDim').textContent='loaded ✓'; }, {once:true});
+  const a=assets.find(x=>x.id===id); if(!a) return;
+  activeId=id;
+  const v=document.getElementById('stageViewer');
+  v.setAttribute('src',a.src);
+  document.getElementById('nowName').textContent=a.name;
+  document.getElementById('nowFmt').textContent=a.fmt;
+  document.getElementById('nowDim').textContent='loading…';
+  document.getElementById('mFormat').textContent=a.fmt;
+  document.getElementById('mSize').textContent=a.size;
+  document.getElementById('mAr').textContent='Ready';
+  v.addEventListener('load',()=>document.getElementById('nowDim').textContent='loaded ✓',{once:true});
   renderRepo();
 }
-function delAsset(id){
-  assets = assets.filter(a=>a.id!==id);
-  if(activeId===id){ activeId=null;
-    if(assets[0]) loadAsset(assets[0].id);
-    else { document.getElementById('stageViewer').removeAttribute('src');
-      document.getElementById('nowName').textContent='No asset loaded';
-      document.getElementById('nowFmt').textContent='— —';
-      document.getElementById('nowDim').textContent='ready'; }
-  }
-  renderRepo();
-  toast('Asset removed');
+async function delAsset(id){
+  const a=assets.find(x=>x.id===id); if(!a) return;
+  if(!confirm('Delete "'+a.name+'" permanently?')) return;
+  try{
+    if(a.path) await sb.storage.from(BUCKET).remove([a.path]);
+    const { error } = await sb.from('assets').delete().eq('id',id);
+    if(error) throw error;
+  }catch(e){ toast('Delete failed: '+e.message); return; }
+  assets=assets.filter(x=>x.id!==id);
+  if(activeId===id){ activeId=null; assets[0]?loadAsset(assets[0].id):showSample(); }
+  renderRepo(); toast('Asset deleted');
 }
 
-/* ---------------- Upload ---------------- */
-let pendingFile = null;
-const dz = document.getElementById('dropzone');
-const fileInput = document.getElementById('fileInput');
-
-dz.addEventListener('click', ()=>fileInput.click());
+/* ===================== UPLOAD ===================== */
+const dz=document.getElementById('dropzone'), fileInput=document.getElementById('fileInput');
+dz.addEventListener('click',()=>fileInput.click());
 ['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add('drag')}));
 ['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.remove('drag')}));
 dz.addEventListener('drop',ev=>handleFile(ev.dataTransfer.files[0]));
 fileInput.addEventListener('change',ev=>handleFile(ev.target.files[0]));
-
 function handleFile(file){
   if(!file) return;
-  const ok = /\.(glb|gltf|usdz)$/i.test(file.name);
-  if(!ok){ toast('Only .glb, .gltf or .usdz files'); return; }
-  pendingFile = file;
-  dz.classList.add('has');
-  document.getElementById('dropText').textContent = file.name;
-  const nameInput = document.getElementById('assetName');
-  if(!nameInput.value) nameInput.value = file.name.replace(/\.(glb|gltf|usdz)$/i,'');
-  const btn = document.getElementById('deployBtn');
-  btn.style.opacity='1'; btn.style.pointerEvents='auto';
+  if(!/\.(glb|gltf|usdz)$/i.test(file.name)){ toast('Only .glb, .gltf or .usdz files'); return; }
+  pendingFile=file; dz.classList.add('has');
+  document.getElementById('dropText').textContent=file.name;
+  const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|usdz)$/i,'');
+  const b=document.getElementById('deployBtn'); b.style.opacity='1'; b.style.pointerEvents='auto';
 }
-function deploy(){
-  if(!pendingFile) return;
-  const name = document.getElementById('assetName').value.trim() || pendingFile.name;
-  const fmt = pendingFile.name.split('.').pop().toUpperCase();
-  const size = (pendingFile.size/1048576).toFixed(1)+' MB';
-  const src = URL.createObjectURL(pendingFile);
-  const id = uid();
-  assets.unshift({id, name, src, fmt, size});
-  renderRepo(); loadAsset(id);
-  // reset
-  pendingFile=null;
-  dz.classList.remove('has');
+function deployLoading(on){ document.getElementById('deployBtn').classList.toggle('loading',on); }
+async function deploy(){
+  if(!pendingFile||!user) return;
+  const name=document.getElementById('assetName').value.trim()||pendingFile.name;
+  const fmt=pendingFile.name.split('.').pop().toUpperCase();
+  const size=(pendingFile.size/1048576).toFixed(1)+' MB';
+  const path=`${user.id}/${Date.now()}-${slug(pendingFile.name)}`;
+  deployLoading(true);
+  try{
+    const up=await sb.storage.from(BUCKET).upload(path,pendingFile,{upsert:false,contentType:pendingFile.type||'model/gltf-binary'});
+    if(up.error) throw up.error;
+    const url=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const ins=await sb.from('assets').insert({user_id:user.id,name,format:fmt,size,path,url}).select().single();
+    if(ins.error) throw ins.error;
+    const r=ins.data;
+    assets.unshift({id:r.id,name:r.name,src:r.url,fmt:r.format,size:r.size,path:r.path});
+    renderRepo(); loadAsset(r.id); resetUpload(); toast('Asset saved to Supabase ✓');
+  }catch(e){ toast('Upload failed: '+(e.message||e)); }
+  deployLoading(false);
+}
+function resetUpload(){
+  pendingFile=null; dz.classList.remove('has');
   document.getElementById('dropText').textContent='Click or drag a 3D model';
-  document.getElementById('assetName').value='';
-  fileInput.value='';
-  const btn=document.getElementById('deployBtn'); btn.style.opacity='.5'; btn.style.pointerEvents='none';
-  toast('Asset deployed ✓');
+  document.getElementById('assetName').value=''; fileInput.value='';
+  const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
 }
 
-/* ---------------- Viewport tools ---------------- */
-let rotating = true;
+/* ===================== VIEWPORT TOOLS ===================== */
+let rotating=true;
 function toggleRotate(){
   rotating=!rotating;
-  const v=document.getElementById('stageViewer'), b=document.getElementById('rotBtn');
-  if(rotating){ v.setAttribute('auto-rotate',''); b.classList.add('active'); }
-  else { v.removeAttribute('auto-rotate'); b.classList.remove('active'); }
+  const v=document.getElementById('stageViewer'),b=document.getElementById('rotBtn');
+  if(rotating){v.setAttribute('auto-rotate','');b.classList.add('active')}else{v.removeAttribute('auto-rotate');b.classList.remove('active')}
 }
-function resetCam(){ const v=document.getElementById('stageViewer'); v.cameraOrbit='0deg 75deg auto'; v.fieldOfView='auto'; toast('Camera reset'); }
-function fullscreen(){ const s=document.querySelector('.stage'); if(!document.fullscreenElement) s.requestFullscreen?.(); else document.exitFullscreen?.(); }
-function launchAR(){
-  const v=document.getElementById('stageViewer');
-  if(v.canActivateAR){ v.activateAR(); }
-  else { toast('Open on a mobile device to view in AR'); }
-}
+function resetCam(){const v=document.getElementById('stageViewer');v.cameraOrbit='0deg 75deg auto';v.fieldOfView='auto';toast('Camera reset')}
+function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
+function launchAR(){const v=document.getElementById('stageViewer');if(v.canActivateAR)v.activateAR();else toast('Open on a mobile device to view in AR')}
 
-/* ---------------- Share ---------------- */
+/* ===================== SHARE ===================== */
 function openShare(id){
-  const a = assets.find(x=>x.id===(id||activeId)) || assets.find(x=>x.id===activeId);
-  const name = a?a.name:'this model';
-  document.getElementById('shareName').textContent = name;
-  document.getElementById('shareLink').value = 'https://ar.creartor.app/v/'+(a?a.id:'demo')+'-'+slug(name);
-  drawQR();
+  const a=assets.find(x=>x.id===(id||activeId)); if(!a){ toast('Load an asset first'); return; }
+  const link=`${location.origin}${location.pathname}?model=${encodeURIComponent(a.src)}&name=${encodeURIComponent(a.name)}`;
+  document.getElementById('shareLink').value=link;
+  document.getElementById('shareName').textContent=a.name;
+  makeQR(link);
   document.getElementById('shareModal').classList.add('show');
 }
-function closeShare(){ document.getElementById('shareModal').classList.remove('show'); }
-function copyLink(){
-  const inp=document.getElementById('shareLink'); inp.select();
-  navigator.clipboard?.writeText(inp.value); toast('Link copied to clipboard');
-}
-function drawQR(){
-  const c=document.getElementById('qr'), ctx=c.getContext('2d'), n=22;
-  ctx.clearRect(0,0,n,n); ctx.fillStyle='#0a0a0c';
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){ if(Math.random()>.52) ctx.fillRect(x,y,1,1); }
-  // finder squares
-  const fp=(ox,oy)=>{ctx.fillRect(ox,oy,7,1);ctx.fillRect(ox,oy+6,7,1);ctx.fillRect(ox,oy,1,7);ctx.fillRect(ox+6,oy,1,7);ctx.fillRect(ox+2,oy+2,3,3)};
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,8,8);ctx.fillRect(14,0,8,8);ctx.fillRect(0,14,8,8);
-  ctx.fillStyle='#0a0a0c';fp(0,0);fp(14,0);fp(0,14);
+function closeShare(){document.getElementById('shareModal').classList.remove('show')}
+function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
+function makeQR(text){
+  const el=document.getElementById('qr'); el.innerHTML='';
+  if(window.QRCode){ new QRCode(el,{text,width:150,height:150,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }
+  else { el.innerHTML='<div class="mono" style="color:#0a0a0c;font-size:11px;padding:20px;text-align:center">QR unavailable</div>'; }
 }
 
-/* ---------------- utils ---------------- */
-function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
-function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-let toastTimer;
-function toast(msg){
-  const t=document.getElementById('toast');
-  document.getElementById('toastMsg').textContent=msg;
-  t.classList.add('show'); clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+/* ===================== SHARED PUBLIC VIEW ===================== */
+function showShared(url,name){
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('app').style.display='none';
+  document.getElementById('sharedView').style.display='flex';
+  document.getElementById('sharedName').textContent=name||'3D model';
+  document.getElementById('sharedViewer').setAttribute('src',url);
 }
+function goWorkspace(){ location.href=location.origin+location.pathname; }
+
+/* ===================== UTILS ===================== */
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9.]+/g,'-').replace(/^-|-$/g,'')}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+let toastTimer;
+function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3200)}
 document.getElementById('shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')closeShare()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
-// allow Enter to submit auth
-['email','password','studio'].forEach(id=>{
-  const el=document.getElementById(id);
-  el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')login()});
-});
+['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
 </script>
 </body>
 </html>
