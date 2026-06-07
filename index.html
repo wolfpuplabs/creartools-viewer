@@ -158,6 +158,17 @@
   .thumb{width:58px;height:58px;border-radius:10px;flex-shrink:0;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.18), transparent 60%),linear-gradient(160deg,#16161c,#0c0c10);border:1px solid var(--line);display:grid;place-items:center}
   .thumb svg{width:26px;height:26px;color:var(--text-3)}
   .thumb model-viewer{position:absolute;inset:0}
+  .thumb-play{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;background:rgba(10,10,12,.4);color:var(--signal);border:none;cursor:pointer;transition:background .2s}
+  .thumb.anim .thumb-play{display:flex}
+  .thumb.anim.playing .thumb-play{background:rgba(10,10,12,0)}
+  .thumb-play svg{width:20px;height:20px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.7));transition:opacity .2s}
+  .thumb-play .i-pause{display:none}
+  .thumb.playing .thumb-play .i-play{opacity:0}
+  .thumb.playing .thumb-play:hover .i-pause{display:block;opacity:1}
+  .thumb.playing .thumb-play:hover{background:rgba(10,10,12,.4)}
+  .thumb .anim-dot{position:absolute;top:5px;right:5px;z-index:3;width:6px;height:6px;border-radius:50%;background:var(--signal);box-shadow:0 0 8px var(--signal);display:none}
+  .thumb.anim .anim-dot{display:block}
+  .tool.hidden{display:none}
   .asset .meta{flex:1;min-width:0}
   .asset .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
   .asset .meta .sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-3);margin-top:3px}
@@ -256,7 +267,7 @@
   <main>
     <section class="stagewrap">
       <div class="stage">
-        <model-viewer id="stageViewer" camera-controls touch-action="pan-y" shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div class="stage-empty" id="stageEmpty">
           <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
           <p>AR-only asset (USDZ)</p>
@@ -273,6 +284,10 @@
           </div>
           <div class="toolbar">
             <button class="tool active" id="rotBtn" title="Auto-rotate" onclick="toggleRotate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0 0 20.5 15"/></svg></button>
+            <button class="tool hidden" id="animBtn" title="Play / pause animation" onclick="toggleAnim()">
+              <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
+              <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+            </button>
             <button class="tool" title="Reset camera" onclick="resetCam()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
             <button class="tool" title="Fullscreen" onclick="fullscreen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
             <button class="tool ar" title="View in AR" onclick="launchAR()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>AR</button>
@@ -489,8 +504,13 @@ function renderRepo(){
   if(!assets.length){ list.innerHTML='<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to save it to the cloud.</p></div>'; return; }
   list.innerHTML=assets.map(a=>`
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
-      <div class="thumb">${a.src
-        ? `<model-viewer src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer>`
+      <div class="thumb" id="thwrap-${a.id}">${a.src
+        ? `<model-viewer id="th-${a.id}" src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer>
+           <span class="anim-dot"></span>
+           <button class="thumb-play" title="Play / pause animation" onclick="toggleThumb(event,'${a.id}')">
+             <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
+             <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+           </button>`
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>`}</div>
       <div class="meta">
         <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</span>${a.iosSrc?'<span class="badge-ios">iOS AR</span>':''}</div>
@@ -501,6 +521,22 @@ function renderRepo(){
         <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
       </div>
     </div>`).join('');
+  // detect which thumbnails are animated -> reveal the play badge
+  assets.forEach(a=>{
+    if(!a.src) return;
+    const mv=document.getElementById('th-'+a.id);
+    if(!mv) return;
+    mv.addEventListener('load',()=>{
+      try{ if(mv.availableAnimations && mv.availableAnimations.length){ document.getElementById('thwrap-'+a.id)?.classList.add('anim'); mv.pause(); } }catch(e){}
+    },{once:true});
+  });
+}
+function toggleThumb(e,id){
+  e.stopPropagation();
+  const wrap=document.getElementById('thwrap-'+id), mv=document.getElementById('th-'+id);
+  if(!mv) return;
+  if(!(mv.availableAnimations && mv.availableAnimations.length)){ loadAsset(id); return; }
+  if(mv.paused){ mv.play(); wrap.classList.add('playing'); } else { mv.pause(); wrap.classList.remove('playing'); }
 }
 function loadAsset(id){
   const a=assets.find(x=>x.id===id); if(!a) return;
@@ -514,6 +550,7 @@ function loadAsset(id){
   }else{
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
     document.getElementById('nowDim').textContent='AR-only';
+    document.getElementById('animBtn').classList.add('hidden');
   }
   if(a.iosSrc) v.setAttribute('ios-src',a.iosSrc); else v.removeAttribute('ios-src');
   const fmtLabel = a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ';
@@ -610,6 +647,23 @@ function resetUpload(){
 
 /* ===================== VIEWPORT TOOLS ===================== */
 let rotating=true;
+function updateAnimBtn(){
+  const v=document.getElementById('stageViewer'), b=document.getElementById('animBtn');
+  const has = v.availableAnimations && v.availableAnimations.length>0;
+  b.classList.toggle('hidden', !has);
+  if(has) setAnimIcon(!v.paused);
+}
+function setAnimIcon(playing){
+  const b=document.getElementById('animBtn');
+  b.classList.toggle('active',playing);
+  b.querySelector('.i-play').style.display = playing?'none':'block';
+  b.querySelector('.i-pause').style.display = playing?'block':'none';
+}
+function toggleAnim(){
+  const v=document.getElementById('stageViewer');
+  if(!(v.availableAnimations && v.availableAnimations.length)) return;
+  if(v.paused){ v.play(); setAnimIcon(true); } else { v.pause(); setAnimIcon(false); }
+}
 function toggleRotate(){
   rotating=!rotating;
   const v=document.getElementById('stageViewer'),b=document.getElementById('rotBtn');
@@ -658,6 +712,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3200)}
 document.getElementById('shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')closeShare()});
+document.getElementById('stageViewer').addEventListener('load', updateAnimBtn);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
 ['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
 </script>
