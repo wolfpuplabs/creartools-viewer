@@ -1,0 +1,61 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15181f"/>
+      <stop offset="1" stop-color="#07080b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="32%" r="62%">
+      <stop offset="0" stop-color="#d4ff3f" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#d4ff3f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eaffa0"/>
+      <stop offset="1" stop-color="#d4ff3f"/>
+    </linearGradient>
+    <linearGradient id="fLeft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b6e64a"/>
+      <stop offset="1" stop-color="#8cc328"/>
+    </linearGradient>
+    <linearGradient id="fRight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fbb2f"/>
+      <stop offset="1" stop-color="#5d7d1c"/>
+    </linearGradient>
+    <filter id="cubeGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feColorMatrix in="b" type="matrix"
+        values="0 0 0 0 0.83  0 0 0 0 1 0  0 0 0 0 0.25  0 0 0 .55 0"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle background -->
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#glow)"/>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity=".07" stroke-width="3"/>
+
+  <!-- AR viewfinder brackets -->
+  <g stroke="#d4ff3f" stroke-opacity=".42" stroke-width="9" stroke-linecap="round" fill="none">
+    <path d="M104 150 V112 a8 8 0 0 1 8-8 H150"/>
+    <path d="M362 104 H400 a8 8 0 0 1 8 8 V150"/>
+    <path d="M408 362 V400 a8 8 0 0 1-8 8 H362"/>
+    <path d="M150 408 H112 a8 8 0 0 1-8-8 V362"/>
+  </g>
+
+  <!-- Glow behind cube -->
+  <g filter="url(#cubeGlow)">
+    <path d="M256 120 L372 188 L256 256 L140 188 Z"/>
+  </g>
+
+  <!-- Isometric cube -->
+  <g>
+    <path d="M256 120 L372 188 L256 256 L140 188 Z" fill="url(#fTop)"/>
+    <path d="M140 188 L256 256 L256 392 L140 324 Z" fill="url(#fLeft)"/>
+    <path d="M372 188 L256 256 L256 392 L372 324 Z" fill="url(#fRight)"/>
+    <!-- highlight edges -->
+    <g stroke="#f3ffba" stroke-opacity=".9" stroke-width="3.5" stroke-linejoin="round" fill="none">
+      <path d="M256 120 L372 188 L256 256 L140 188 Z"/>
+    </g>
+    <g stroke="#0a0c08" stroke-opacity=".28" stroke-width="2.5" stroke-linejoin="round" fill="none">
+      <path d="M256 256 L256 392 M256 256 L140 188 M256 256 L372 188"/>
+    </g>
+  </g>
+</svg>
