@@ -3,148 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Asset Library & Share</title>
-  
+  <title>Diagnostic Radar</title>
   <style>
-    :root { --primary: #007aff; --bg: #f5f5f7; --card-bg: #ffffff; --text: #1d1d1f; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: var(--bg); color: var(--text); }
-    h1, h2, h3 { font-weight: 600; }
-    .container { display: flex; flex-direction: column; gap: 20px; }
-    .section-box { background: var(--card-bg); padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    input[type="text"], input[type="file"] { display: block; width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-    button { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; width: 100%; transition: background 0.2s; }
-    button:disabled { background: #999; cursor: not-allowed; }
-    .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 15px; }
-    .asset-card { background: var(--card-bg); border: 1px solid #e5e5ea; padding: 16px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-    model-viewer { width: 100%; height: 220px; background-color: #f5f5f7; border-radius: 8px; }
-    .btn-group { display: flex; gap: 8px; margin-top: 10px; }
-    .btn-secondary { background: #e5e5ea; color: #1d1d1f; }
-    .error-msg { background: #ff3b30; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
-    .success-msg { background: #34c759; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    .box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    button { background: #007aff; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    #log { background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 8px; font-family: monospace; min-height: 100px; white-space: pre-wrap; font-size: 14px; margin-top: 15px; }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
 
-  <div class="container">
-    <h1>AR Asset Viewer & Library</h1>
-
-    <div class="section-box">
-      <h3>Upload Aset Baru (.glb / .gltf)</h3>
-      <form id="uploadForm">
-        <input type="text" id="assetName" placeholder="Nama Aset (contoh: Sepatu Keren)" required>
-        <input type="file" id="assetFile" accept=".glb,.gltf" required>
-        <button type="submit" id="submitBtn">Simpan ke Supabase</button>
-      </form>
-      <div id="statusMessage"></div>
-    </div>
-
-    <div class="section-box">
-      <h3>Koleksi Aset Saya</h3>
-      <div id="libraryContainer">
-        <p style="color: #666; font-weight: bold;">Mencoba terhubung ke Supabase... Mohon tunggu.</p>
-      </div>
-    </div>
+  <div class="box">
+    <h2>Radar Investigasi Supabase</h2>
+    <p>Klik tombol di bawah untuk menembak server database secara langsung tanpa library.</p>
+    <button onclick="tembakDatabase()">🚀 Tembak Database Sekarang</button>
+    <div id="log">Menunggu instruksi...</div>
   </div>
 
   <script>
-    // Konfigurasi Supabase
-    const SUPABASE_URL = 'https://ogmtrdzimqlxhzomnnzl.supabase.co'; 
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
-    
-    const libraryContainer = document.getElementById('libraryContainer');
-    const statusMessage = document.getElementById('statusMessage');
-    const uploadForm = document.getElementById('uploadForm');
-    const submitBtn = document.getElementById('submitBtn');
-    
-    let supabase;
+    const logBox = document.getElementById('log');
 
-    try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (e) {
-      libraryContainer.innerHTML = `<div class="error-msg"><strong>Gagal Memuat Library:</strong><br>${e.message}</div>`;
+    function catatLog(pesan) {
+      logBox.innerHTML += `\n> ${pesan}`;
     }
 
-    async function muatKoleksiAset() {
+    async function tembakDatabase() {
+      logBox.innerHTML = "> Memulai proses...";
+      const SUPABASE_URL = 'https://ogmtrdzimqlxhzomnnzl.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
+      
+      // Menggunakan URL API Mentah (Raw API)
+      const targetUrl = `${SUPABASE_URL}/rest/v1/user_assets?select=*&limit=1`;
+      
+      catatLog("Membangun jaringan ke: " + targetUrl);
+      catatLog("Mengirim request...");
+
       try {
-        const { data, error } = await supabase.from('user_assets').select('*').order('created_at', { ascending: false });
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-        if (error) {
-          throw error; // Lempar ke blok catch di bawah
-        }
+        catatLog(`Server merespons dengan Status: ${response.status} (${response.statusText})`);
 
-        if (!data || data.length === 0) {
-          libraryContainer.innerHTML = '<p style="color:#666;">Belum ada aset. Silakan upload!</p>';
+        if (!response.ok) {
+          const errorText = await response.text();
+          catatLog("🚨 ERROR DARI SERVER: " + errorText);
           return;
         }
 
-        let gridHtml = '<div class="library-grid">';
-        data.forEach(asset => {
-          gridHtml += `
-            <div class="asset-card">
-              <h4 style="margin: 0 0 10px 0;">${asset.asset_name}</h4>
-              <model-viewer src="${asset.file_url}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
-              <div class="btn-group">
-                <button onclick="window.open('${asset.file_url}', '_blank')">Buka File</button>
-              </div>
-            </div>
-          `;
-        });
-        gridHtml += '</div>';
-        libraryContainer.innerHTML = gridHtml;
+        const data = await response.json();
+        catatLog("✅ SUKSES! Database berhasil ditembus.");
+        catatLog("Isi Data: " + JSON.stringify(data));
 
-      } catch (err) {
-        // Ini akan menangkap error jaringan, RLS, atau tabel tidak ditemukan
-        libraryContainer.innerHTML = `
-          <div class="error-msg">
-            <strong>🚨 Gagal Mengambil Data (Database Error):</strong><br>
-            ${err.message || JSON.stringify(err)}
-          </div>`;
+      } catch (error) {
+        catatLog("🚨 JARINGAN TERBLOKIR / CRASH: " + error.message);
+        catatLog("Saran: Coba matikan VPN, Ad-Blocker, atau buka dari HP lain/koneksi WiFi lain.");
       }
-    }
-
-    uploadForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const file = document.getElementById('assetFile').files[0];
-      const name = document.getElementById('assetName').value;
-
-      submitBtn.disabled = true;
-      statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">Sedang mengunggah...</div>';
-
-      try {
-        const filePath = `models/${Date.now()}_${file.name}`;
-        
-        // 1. Upload
-        const { error: storageError } = await supabase.storage.from('ar_assets').upload(filePath, file);
-        if (storageError) throw storageError;
-
-        // 2. Get URL
-        const { data: publicUrlData } = supabase.storage.from('ar_assets').getPublicUrl(filePath);
-        
-        // 3. Simpan ke Database
-        const { error: dbError } = await supabase.from('user_assets').insert([{ 
-          asset_name: name, 
-          file_url: publicUrlData.publicUrl, 
-          file_path: filePath 
-        }]);
-        if (dbError) throw dbError;
-
-        statusMessage.innerHTML = '<div class="success-msg">🎉 Aset Berhasil Disimpan!</div>';
-        uploadForm.reset();
-        muatKoleksiAset(); // Refresh gallery
-
-      } catch (err) {
-        statusMessage.innerHTML = `<div class="error-msg"><strong>🚨 Gagal Upload:</strong><br>${err.message}</div>`;
-      } finally {
-        submitBtn.disabled = false;
-      }
-    });
-
-    // Jalankan fungsi
-    if (supabase) {
-      muatKoleksiAset();
     }
   </script>
 </body>
