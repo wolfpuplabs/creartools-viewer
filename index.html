@@ -19,8 +19,6 @@
     model-viewer { width: 100%; height: 220px; background-color: #f5f5f7; border-radius: 8px; }
     .btn-group { display: flex; gap: 8px; margin-top: 10px; }
     .btn-secondary { background: #e5e5ea; color: #1d1d1f; }
-    #sharedAssetBanner { background: linear-gradient(135deg, #007aff, #00c6ff); color: white; display: none; }
-    #sharedAssetBanner model-viewer { background-color: rgba(255,255,255,0.2); }
     .error-msg { background: #ff3b30; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
     .success-msg { background: #34c759; color: white; padding: 15px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
   </style>
@@ -32,12 +30,6 @@
 
   <div class="container">
     <h1>AR Asset Viewer & Library</h1>
-
-    <div id="sharedAssetBanner" class="section-box">
-      <h2>📦 Model yang Dibagikan Kepada Anda</h2>
-      <div id="sharedViewerContainer"></div>
-      <button class="btn-secondary" style="margin-top:10px;" onclick="window.location.search=''">Lihat Semua Koleksi</button>
-    </div>
 
     <div class="section-box">
       <h3>Upload Aset Baru (.glb / .gltf)</h3>
@@ -52,124 +44,108 @@
     <div class="section-box">
       <h3>Koleksi Aset Saya</h3>
       <div id="libraryContainer">
-        <p style="color: #666;">Memuat aset dari Supabase...</p>
+        <p style="color: #666; font-weight: bold;">Mencoba terhubung ke Supabase... Mohon tunggu.</p>
       </div>
     </div>
   </div>
 
   <script>
-    // --- SISTEM PELACAK ERROR UNTUK IPAD/SAFARI ---
-    window.onerror = function(message, source, lineno, colno, error) {
-      document.getElementById('libraryContainer').innerHTML = `
-        <div class="error-msg">
-          <strong>🚨 ADA KODE YANG CRASH:</strong><br><br>
-          Pesan: ${message}<br>
-          Baris: ${lineno}
-        </div>
-      `;
-      return true; 
-    };
-
-    // Pastikan script Supabase tidak diblokir oleh Safari/Adblocker
-    if (typeof window.supabase === 'undefined') {
-      throw new Error("Library Supabase diblokir oleh browser! Coba matikan Ad-Blocker/Tracking Protection di pengaturan Safari, atau gunakan mode Incognito/Private.");
-    }
-
+    // Konfigurasi Supabase
     const SUPABASE_URL = 'https://ogmtrdzimqlxhzomnnzl.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
     
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const uploadForm = document.getElementById('uploadForm');
-    const assetNameInput = document.getElementById('assetName');
-    const assetFileInput = document.getElementById('assetFile');
-    const submitBtn = document.getElementById('submitBtn');
-    const statusMessage = document.getElementById('statusMessage');
     const libraryContainer = document.getElementById('libraryContainer');
+    const statusMessage = document.getElementById('statusMessage');
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    let supabase;
+
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+      libraryContainer.innerHTML = `<div class="error-msg"><strong>Gagal Memuat Library:</strong><br>${e.message}</div>`;
+    }
 
     async function muatKoleksiAset() {
-      const { data, error } = await supabase.from('user_assets').select('*').order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase.from('user_assets').select('*').order('created_at', { ascending: false });
 
-      if (error) {
-        throw new Error("Gagal membaca database: " + error.message);
-      }
+        if (error) {
+          throw error; // Lempar ke blok catch di bawah
+        }
 
-      if (!data || data.length === 0) {
-        libraryContainer.innerHTML = '<p style="color:#666;">Belum ada aset yang diupload. Silakan upload file pertama Anda!</p>';
-        return;
-      }
+        if (!data || data.length === 0) {
+          libraryContainer.innerHTML = '<p style="color:#666;">Belum ada aset. Silakan upload!</p>';
+          return;
+        }
 
-      let gridHtml = '<div class="library-grid">';
-      data.forEach(asset => {
-        const shareLink = `${window.location.origin}${window.location.pathname}?model=${encodeURIComponent(asset.file_url)}&name=${encodeURIComponent(asset.asset_name)}`;
-        gridHtml += `
-          <div class="asset-card">
-            <h4 style="margin: 0 0 10px 0;">${asset.asset_name}</h4>
-            <model-viewer src="${asset.file_url}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
-            <div class="btn-group">
-              <button onclick="window.open('${asset.file_url}', '_blank')">Detail</button>
-              <button class="btn-secondary" onclick="navigator.clipboard.writeText('${shareLink}').then(()=>alert('Link tersalin!')).catch(()=>prompt('Salin link ini:', '${shareLink}'))">🔗 Share</button>
+        let gridHtml = '<div class="library-grid">';
+        data.forEach(asset => {
+          gridHtml += `
+            <div class="asset-card">
+              <h4 style="margin: 0 0 10px 0;">${asset.asset_name}</h4>
+              <model-viewer src="${asset.file_url}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate></model-viewer>
+              <div class="btn-group">
+                <button onclick="window.open('${asset.file_url}', '_blank')">Buka File</button>
+              </div>
             </div>
-          </div>
-        `;
-      });
-      gridHtml += '</div>';
-      libraryContainer.innerHTML = gridHtml;
+          `;
+        });
+        gridHtml += '</div>';
+        libraryContainer.innerHTML = gridHtml;
+
+      } catch (err) {
+        // Ini akan menangkap error jaringan, RLS, atau tabel tidak ditemukan
+        libraryContainer.innerHTML = `
+          <div class="error-msg">
+            <strong>🚨 Gagal Mengambil Data (Database Error):</strong><br>
+            ${err.message || JSON.stringify(err)}
+          </div>`;
+      }
     }
 
     uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const file = assetFileInput.files[0];
-      const name = assetNameInput.value;
-      if (!file) return;
+      const file = document.getElementById('assetFile').files[0];
+      const name = document.getElementById('assetName').value;
 
       submitBtn.disabled = true;
-      statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">Sedang mengunggah file ke Supabase Storage (Mohon tunggu)...</div>';
+      statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">Sedang mengunggah...</div>';
 
       try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `models/${fileName}`;
+        const filePath = `models/${Date.now()}_${file.name}`;
+        
+        // 1. Upload
+        const { error: storageError } = await supabase.storage.from('ar_assets').upload(filePath, file);
+        if (storageError) throw storageError;
 
-        const { data: storageData, error: storageError } = await supabase.storage.from('ar_assets').upload(filePath, file);
-        if (storageError) throw new Error("Storage Error: " + storageError.message);
-
+        // 2. Get URL
         const { data: publicUrlData } = supabase.storage.from('ar_assets').getPublicUrl(filePath);
-        const fileUrl = publicUrlData.publicUrl;
+        
+        // 3. Simpan ke Database
+        const { error: dbError } = await supabase.from('user_assets').insert([{ 
+          asset_name: name, 
+          file_url: publicUrlData.publicUrl, 
+          file_path: filePath 
+        }]);
+        if (dbError) throw dbError;
 
-        statusMessage.innerHTML = '<div style="color:var(--primary); font-weight:bold;">File terupload! Menyimpan ke database...</div>';
-
-        const { error: dbError } = await supabase.from('user_assets').insert([{ asset_name: name, file_url: fileUrl, file_path: filePath }]);
-        if (dbError) throw new Error("Database Error: " + dbError.message);
-
-        statusMessage.innerHTML = '<div class="success-msg">🎉 Aset Berhasil Disimpan dan Siap Dibagikan!</div>';
+        statusMessage.innerHTML = '<div class="success-msg">🎉 Aset Berhasil Disimpan!</div>';
         uploadForm.reset();
-        muatKoleksiAset();
+        muatKoleksiAset(); // Refresh gallery
 
       } catch (err) {
-        statusMessage.innerHTML = `<div class="error-msg"><strong>Gagal Upload:</strong><br>${err.message}</div>`;
+        statusMessage.innerHTML = `<div class="error-msg"><strong>🚨 Gagal Upload:</strong><br>${err.message}</div>`;
       } finally {
         submitBtn.disabled = false;
       }
     });
 
-    function periksaLinkShare() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const modelUrl = urlParams.get('model');
-      const modelName = urlParams.get('name') || 'Shared Object';
-
-      if (modelUrl) {
-        document.getElementById('sharedAssetBanner').style.display = 'block';
-        document.getElementById('sharedViewerContainer').innerHTML = `
-          <h3 style="margin-top:0;">${decodeURIComponent(modelName)}</h3>
-          <model-viewer src="${decodeURIComponent(modelUrl)}" ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate style="height: 300px;"></model-viewer>
-        `;
-      }
+    // Jalankan fungsi
+    if (supabase) {
+      muatKoleksiAset();
     }
-
-    // Mulai inisialisasi
-    periksaLinkShare();
-    muatKoleksiAset();
   </script>
 </body>
 </html>
