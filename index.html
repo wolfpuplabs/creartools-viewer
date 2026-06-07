@@ -1,201 +1,170 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CREARTOOLS - 3DGS Viewer</title>
-    
-    <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background-color: #1a1a1a; 
-            color: white; 
-            font-family: sans-serif; 
-        }
-        #canvas-3d { 
-            width: 100vw; 
-            height: 100vh; 
-            display: block; 
-        }
-        
-        /* UI Overlay untuk Upload */
-        #ui-container {
-            position: absolute; 
-            top: 20px; 
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8); 
-            padding: 20px;
-            border-radius: 8px; 
-            z-index: 10;
-            max-width: 300px;
-        }
-        input[type="file"] { margin-top: 10px; margin-bottom: 15px; width: 100%; }
-        button { 
-            background-color: #4ade80; 
-            color: black; 
-            border: none; 
-            padding: 10px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            width: 100%; 
-            font-weight: bold;
-        }
-        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
-        #status-text { margin-top: 15px; font-size: 14px; color: #fbbf24; }
-        #share-link { 
-            display: block;
-            margin-top: 15px; 
-            color: #60a5fa; 
-            word-break: break-all; 
-            text-decoration: none;
-            font-size: 14px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Asset Library</title>
+  
+  <!-- CSS Sederhana untuk mempercantik tampilan -->
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .upload-section { background: #f0f0f0; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+    .upload-section input, .upload-section button { margin: 5px 0; padding: 8px; width: 100%; box-sizing: border-box; }
+    .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+    .asset-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center; }
+    model-viewer { width: 100%; height: 200px; background-color: #eee; border-radius: 4px; }
+  </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>eruda.init();</script>
+  <!-- 1. Import library Supabase dan Model Viewer via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
 
-    <div id="ui-container">
-        <h3>CREARTOOLS</h3>
-        <p style="font-size: 12px; color: #ccc;">Upload aset (.splat / .ply)</p>
+  <h1>AR Asset Library</h1>
+
+  <!-- Bagian Upload -->
+  <div class="upload-section">
+    <h3>Upload Aset Baru</h3>
+    <form id="uploadForm">
+      <input type="text" id="assetName" placeholder="Nama Aset (contoh: Kursi Kayu)" required>
+      <input type="file" id="assetFile" accept=".glb,.gltf" required>
+      <button type="submit" id="submitBtn">Upload ke Supabase</button>
+    </form>
+    <p id="uploadStatus" style="color: blue; font-size: 14px;"></p>
+  </div>
+
+  <!-- Bagian Library / Galeri -->
+  <h3>Koleksi Aset Saya</h3>
+  <div class="library-grid" id="libraryContainer">
+    <p>Memuat aset...</p>
+  </div>
+
+  <!-- 2. Logika JavaScript -->
+  <script>
+    // --- INISIALISASI SUPABASE ---
+    const SUPABASE_URL = 'SUPABASE_URL_KAMU'; 
+    const SUPABASE_ANON_KEY = 'SUPABASE_ANON_KEY_KAMU';
+    
+    // Membuat instance client Supabase
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // --- REFERENSI ELEMEN HTML ---
+    const uploadForm = document.getElementById('uploadForm');
+    const assetNameInput = document.getElementById('assetName');
+    const assetFileInput = document.getElementById('assetFile');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const libraryContainer = document.getElementById('libraryContainer');
+
+    // --- FUNGSI MENGAMBIL DAN MENAMPILKAN ASET ---
+    async function fetchAndDisplayAssets() {
+      libraryContainer.innerHTML = '<p>Memuat aset...</p>';
+
+      // Ambil data dari tabel 'user_assets'
+      const { data, error } = await supabase
+        .from('user_assets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching data:', error);
+        libraryContainer.innerHTML = '<p style="color:red;">Gagal memuat data.</p>';
+        return;
+      }
+
+      if (data.length === 0) {
+        libraryContainer.innerHTML = '<p>Belum ada aset yang diupload.</p>';
+        return;
+      }
+
+      // Bersihkan container dan buat elemen untuk setiap aset
+      libraryContainer.innerHTML = '';
+      data.forEach(asset => {
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        card.innerHTML = `
+          <h4>${asset.asset_name}</h4>
+          <!-- Model Viewer untuk menampilkan 3D / AR -->
+          <model-viewer 
+            src="${asset.file_url}" 
+            ar 
+            ar-modes="webxr scene-viewer quick-look" 
+            camera-controls 
+            auto-rotate>
+          </model-viewer>
+          <p style="font-size: 12px; color: #666;">
+            Diunggah: ${new Date(asset.created_at).toLocaleDateString()}
+          </p>
+        `;
+        libraryContainer.appendChild(card);
+      });
+    }
+
+    // --- FUNGSI MENGUPLOAD ASET ---
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const file = assetFileInput.files[0];
+      const assetName = assetNameInput.value;
+
+      submitBtn.disabled = true;
+      uploadStatus.innerText = 'Sedang mengupload file... Mohon tunggu.';
+
+      try {
+        // 1. Upload ke Storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `models/${fileName}`;
+
+        const { error: storageError } = await supabase
+          .storage
+          .from('ar_assets')
+          .upload(filePath, file);
+
+        if (storageError) throw storageError;
+
+        // 2. Dapatkan URL Publik
+        uploadStatus.innerText = 'Menyimpan data ke database...';
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('ar_assets')
+          .getPublicUrl(filePath);
+
+        const fileUrl = publicUrlData.publicUrl;
+
+        // 3. Simpan ke Database
+        const { error: dbError } = await supabase
+          .from('user_assets')
+          .insert([{ 
+            asset_name: assetName, 
+            file_url: fileUrl, 
+            file_path: filePath 
+          }]);
+
+        if (dbError) throw dbError;
+
+        // 4. Sukses
+        uploadStatus.style.color = 'green';
+        uploadStatus.innerText = 'Upload berhasil!';
+        uploadForm.reset();
         
-        <input type="file" id="file-input" accept=".splat,.ply" />
-        <button id="upload-btn">Upload & Generate Link</button>
-        
-        <p id="status-text"></p>
-        <a id="share-link" href="#" target="_blank" style="display: none;"></a>
-    </div>
+        // Refresh library untuk menampilkan aset baru
+        fetchAndDisplayAssets();
 
-    <canvas id="canvas-3d"></canvas>
+      } catch (error) {
+        console.error('Upload error:', error);
+        uploadStatus.style.color = 'red';
+        uploadStatus.innerText = `Gagal mengupload: ${error.message}`;
+      } finally {
+        submitBtn.disabled = false;
+        setTimeout(() => { uploadStatus.innerText = ''; uploadStatus.style.color = 'blue'; }, 3000);
+      }
+    });
 
-    <script type="module">
-        // Import Library via CDN
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-        import { Viewer } from 'https://esm.sh/@manycore/aholo-viewer'; 
+    // --- JALANKAN SAAT HALAMAN DIMUAT ---
+    fetchAndDisplayAssets();
 
-        // Kredensial Supabase
-        const supabaseUrl = 'https://ogmtrdzimqlxhzomnnzl.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbXRyZHppbXFseGh6b21ubnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjI4ODgsImV4cCI6MjA5NjI5ODg4OH0.fXdfuU7iELLJC2ZJXrQMBq3YxZd2hRQc7Mi2TjZR7N8';
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
-        // Inisialisasi Kanvas dan Aholo Viewer
-        const canvas = document.getElementById('canvas-3d');
-        const viewer = new Viewer(canvas);
-
-        // Ambil elemen UI
-        const fileInput = document.getElementById('file-input');
-        const uploadBtn = document.getElementById('upload-btn');
-        const statusText = document.getElementById('status-text');
-        const shareLinkEl = document.getElementById('share-link');
-        const uiContainer = document.getElementById('ui-container');
-
-        // ==========================================
-        // 1. CEK PARAMETER URL (MODE SHARE)
-        // ==========================================
-        const urlParams = new URLSearchParams(window.location.search);
-        const sharedId = urlParams.get('id');
-
-        if (sharedId) {
-            // Jika ada ID di URL, sembunyikan UI Upload
-            uiContainer.style.display = 'none';
-            loadSharedModel(sharedId);
-        }
-
-        async function loadSharedModel(id) {
-            try {
-                console.log("Mencari data ID:", id);
-                const { data, error } = await supabase
-                    .from('shared_assets')
-                    .select('file_url')
-                    .eq('id', id)
-                    .single();
-
-                if (error) throw error;
-
-                if (data && data.file_url) {
-                    console.log("File ditemukan, memuat dari:", data.file_url);
-                    await viewer.load(data.file_url);
-                    viewer.start();
-                }
-            } catch (err) {
-                console.error("Gagal memuat model:", err);
-                alert("Gagal memuat model. Silakan buka Console (ikon ⚙️) untuk detailnya.");
-            }
-        }
-
-        // ==========================================
-        // 2. PROSES UPLOAD FILE
-        // ==========================================
-        uploadBtn.addEventListener('click', async () => {
-            const file = fileInput.files[0];
-            if (!file) {
-                alert("Pilih file terlebih dahulu!");
-                return;
-            }
-
-            try {
-                // Nonaktifkan tombol dan update status
-                uploadBtn.disabled = true;
-                statusText.innerText = "Mengunggah ke database (ini mungkin memakan waktu)...";
-                console.log("Mulai mengunggah file:", file.name);
-
-                // Nama unik untuk file agar tidak tertimpa
-                const fileName = `${Date.now()}_${file.name}`;
-                
-                // Upload ke Storage Supabase
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('models')
-                    .upload(fileName, file);
-
-                if (uploadError) throw uploadError;
-                console.log("Upload storage berhasil.");
-
-                statusText.innerText = "Mendapatkan tautan file...";
-
-                // Ambil Public URL dari file yang baru diupload
-                const { data: publicUrlData } = supabase.storage
-                    .from('models')
-                    .getPublicUrl(fileName);
-                const fileUrl = publicUrlData.publicUrl;
-
-                // Simpan URL ke tabel Database
-                const { data: dbData, error: dbError } = await supabase
-                    .from('shared_assets')
-                    .insert([{ file_url: fileUrl }])
-                    .select()
-                    .single();
-
-                if (dbError) throw dbError;
-                console.log("Data berhasil disimpan ke tabel.");
-
-                // Buat dan tampilkan Link Share
-                // Menggunakan origin dari GitHub Pages agar linknya benar
-                const shareUrl = `${window.location.origin}${window.location.pathname}?id=${dbData.id}`;
-                
-                statusText.innerText = "Upload Berhasil!";
-                statusText.style.color = "#4ade80"; // Ubah warna jadi hijau
-                
-                shareLinkEl.href = shareUrl;
-                shareLinkEl.innerText = `🔗 Klik di sini untuk Link Share`;
-                shareLinkEl.style.display = 'block';
-
-                // Tampilkan model secara langsung di kanvas
-                console.log("Memuat model ke kanvas...");
-                await viewer.load(fileUrl);
-                viewer.start();
-
-            } catch (err) {
-                statusText.innerText = "Terjadi kesalahan. Cek Console.";
-                statusText.style.color = "#f87171"; // Ubah warna jadi merah
-                console.error("Error Detail:", err);
-            } finally {
-                uploadBtn.disabled = false;
-            }
-        });
-    </script>
+  </script>
 </body>
 </html>
