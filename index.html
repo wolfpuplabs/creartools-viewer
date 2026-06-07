@@ -6,48 +6,60 @@
   <title>Creartor AR | Workspace</title>
   
   <style>
-    /* UI/UX REDESIGN: Vercel-like Minimalist Dark Theme */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    /* UI/UX REDESIGN: Techie, Dark, Elegant, Glassmorphism HUD */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     :root { 
-      --bg-base: #000000;
-      --bg-surface: #111111;
-      --bg-surface-hover: #1a1a1a;
-      --border-color: #333333;
-      --border-hover: #444444;
-      --text-main: #ffffff;
-      --text-muted: #888888;
-      --primary: #ffffff;
+      /* Deep space dark palette */
+      --bg-base: #030508;
+      /* Frosted glass surfaces */
+      --bg-surface: rgba(15, 20, 30, 0.45);
+      --bg-surface-hover: rgba(25, 35, 50, 0.6);
+      /* Techie neon borders */
+      --border-color: rgba(180, 255, 0, 0.15);
+      --border-hover: rgba(180, 255, 0, 0.6);
+      --border-accent: rgba(0, 229, 255, 0.3);
+      /* Typography */
+      --text-main: #e0e6ed;
+      --text-muted: #8b9bb4;
+      /* Brand colors */
+      --primary: #b4ff00; /* Lime green */
       --primary-invert: #000000;
-      --accent: #0070f3;
-      --danger: #e00;
-      --success: #0070f3;
-      --radius: 8px;
+      --accent: #00e5ff; /* Cyber blue */
+      --danger: #ff2a5f;
+      --radius: 12px;
+      --glass-blur: blur(16px);
     }
 
     body { 
       font-family: 'Inter', -apple-system, sans-serif; 
       margin: 0; 
       padding: 0; 
-      background-color: var(--bg-base); 
+      /* Techie background with subtle radial glow */
+      background: radial-gradient(circle at 50% 0%, #0d1b2a 0%, var(--bg-base) 80%);
+      background-attachment: fixed;
       color: var(--text-main); 
       -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
     }
 
-    h1, h2, h3 { font-weight: 600; margin: 0; }
+    h1, h2, h3 { font-weight: 600; margin: 0; letter-spacing: 0.5px; }
     
-    /* Navbar */
+    /* Navbar - Floating Glass */
     .navbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border-color);
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      padding: 16px 32px;
+      margin: 16px 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
       position: sticky;
-      top: 0;
+      top: 16px;
       z-index: 100;
     }
 
@@ -55,96 +67,137 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      letter-spacing: -0.5px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--primary);
+      text-shadow: 0 0 10px rgba(180, 255, 0, 0.3);
     }
 
     .brand img {
-      height: 28px; /* Sesuaikan ukuran logomu */
+      height: 28px; 
       width: auto;
       border-radius: 4px;
+      filter: drop-shadow(0 0 5px rgba(180, 255, 0, 0.5));
     }
 
     .logout-btn { 
       background: none; border: none; color: var(--text-muted); font-weight: 500; 
-      cursor: pointer; display: none; font-size: 0.9rem; transition: color 0.2s;
+      cursor: pointer; display: none; font-size: 0.9rem; transition: all 0.3s ease;
+      text-transform: uppercase; letter-spacing: 1px;
     }
-    .logout-btn:hover { color: var(--text-main); }
+    .logout-btn:hover { color: var(--danger); text-shadow: 0 0 8px rgba(255, 42, 95, 0.5); }
 
     .container { max-width: 1000px; margin: 40px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 40px; }
     
-    /* Vercel-like Cards */
+    /* HUD Glass Cards */
     .section-box { 
-      background: var(--bg-base); 
+      background: var(--bg-surface); 
       padding: 32px; 
       border-radius: var(--radius); 
       border: 1px solid var(--border-color);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
     }
-    .section-header { margin-bottom: 24px; }
-    .section-header h2 { font-size: 1.5rem; letter-spacing: -0.5px; }
-    .section-header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 6px; }
+
+    /* Decorative HUD corner elements */
+    .section-box::before, .section-box::after {
+      content: ''; position: absolute; width: 20px; height: 20px; border: 1px solid transparent; pointer-events: none;
+    }
+    .section-box::before { top: 10px; left: 10px; border-top-color: var(--primary); border-left-color: var(--primary); opacity: 0.5; }
+    .section-box::after { bottom: 10px; right: 10px; border-bottom-color: var(--primary); border-right-color: var(--primary); opacity: 0.5; }
+
+    .section-header { margin-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 16px; }
+    .section-header h2 { font-size: 1.5rem; color: #fff; }
+    .section-header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 8px; font-weight: 300; }
 
     /* Auth Form Styles */
     #authContainer { max-width: 420px; margin: 80px auto; padding: 40px; }
-    .auth-tabs { display: flex; gap: 24px; margin-bottom: 32px; border-bottom: 1px solid var(--border-color); }
-    .auth-tab { padding-bottom: 12px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: 0.2s; position: relative; }
-    .auth-tab.active { color: var(--text-main); }
-    .auth-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background: var(--primary); }
-
-    .input-group { margin-bottom: 20px; }
-    label { display: block; font-weight: 500; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); }
-    input[type="text"], input[type="email"], input[type="password"] { 
-      width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 6px; 
-      font-size: 14px; background: var(--bg-surface); color: var(--text-main); box-sizing: border-box; 
-      transition: border-color 0.2s;
+    .auth-tabs { display: flex; gap: 24px; margin-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .auth-tab { padding-bottom: 12px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: 0.3s; position: relative; letter-spacing: 0.5px; }
+    .auth-tab:hover { color: var(--text-main); }
+    .auth-tab.active { color: var(--primary); text-shadow: 0 0 8px rgba(180, 255, 0, 0.3); }
+    .auth-tab.active::after { 
+      content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; 
+      background: var(--primary); box-shadow: 0 0 10px var(--primary); 
     }
-    input:focus { outline: none; border-color: var(--text-muted); }
+
+    .input-group { margin-bottom: 24px; }
+    label { display: block; font-weight: 500; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
     
+    input[type="text"], input[type="email"], input[type="password"] { 
+      width: 100%; padding: 14px 16px; border: 1px solid var(--border-accent); border-radius: 8px; 
+      font-size: 14px; background: rgba(0, 0, 0, 0.5); color: #fff; box-sizing: border-box; 
+      transition: all 0.3s ease; font-family: 'Inter', sans-serif;
+    }
+    input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 15px rgba(180, 255, 0, 0.15); background: rgba(0, 0, 0, 0.8); }
+    
+    /* Upload Area */
     .file-upload-wrapper { position: relative; overflow: hidden; display: block; width: 100%; }
-    .file-upload-wrapper input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; width: 100%; }
+    .file-upload-wrapper input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%; width: 100%; z-index: 10; }
     .file-upload-btn { 
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; 
-      background: var(--bg-surface); color: var(--text-muted); border: 1px dashed var(--border-color); 
-      padding: 32px 16px; border-radius: var(--radius); font-size: 0.9rem; transition: 0.2s; 
+      background: rgba(0, 0, 0, 0.3); color: var(--text-muted); border: 1px dashed var(--border-accent); 
+      padding: 40px 16px; border-radius: var(--radius); font-size: 0.95rem; transition: all 0.3s ease; 
     }
-    .file-upload-wrapper:hover .file-upload-btn { border-color: var(--text-muted); background: var(--bg-surface-hover); }
+    .file-upload-wrapper:hover .file-upload-btn { 
+      border-color: var(--primary); background: rgba(180, 255, 0, 0.05); color: var(--primary);
+      box-shadow: inset 0 0 20px rgba(180, 255, 0, 0.05);
+    }
+    .file-upload-btn svg { transition: stroke 0.3s; }
+    .file-upload-wrapper:hover .file-upload-btn svg { stroke: var(--primary); }
 
+    /* Buttons */
     button.btn-primary { 
       background: var(--primary); color: var(--primary-invert); border: 1px solid var(--primary); 
-      padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; 
-      width: 100%; transition: 0.2s; 
+      padding: 14px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; 
+      width: 100%; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;
+      box-shadow: 0 0 15px rgba(180, 255, 0, 0.3);
     }
-    button.btn-primary:hover { background: transparent; color: var(--primary); }
-    button:disabled { background: var(--border-color); color: var(--text-muted); border-color: var(--border-color); cursor: not-allowed; }
+    button.btn-primary:hover { 
+      background: transparent; color: var(--primary); box-shadow: 0 0 25px rgba(180, 255, 0, 0.4) inset; 
+    }
+    button:disabled { background: rgba(255,255,255,0.1); color: var(--text-muted); border-color: transparent; box-shadow: none; cursor: not-allowed; }
     
     /* Library Grid */
     .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
     .asset-card { 
-      background: var(--bg-base); border-radius: var(--radius); padding: 20px; 
-      border: 1px solid var(--border-color); transition: border-color 0.2s; display: flex; flex-direction: column;
+      background: var(--bg-surface); border-radius: var(--radius); padding: 16px; 
+      border: 1px solid var(--border-color); transition: all 0.3s ease; display: flex; flex-direction: column;
+      backdrop-filter: var(--glass-blur);
     }
-    .asset-card:hover { border-color: var(--border-hover); }
-    model-viewer { width: 100%; height: 240px; background-color: var(--bg-surface); border-radius: 4px; margin-bottom: 20px; outline: none; }
-    .asset-title { font-size: 1rem; font-weight: 500; margin: 0 0 16px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-card:hover { 
+      border-color: var(--primary); transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(180, 255, 0, 0.1);
+    }
+    model-viewer { 
+      width: 100%; height: 240px; background: radial-gradient(circle, rgba(25,35,50,0.8) 0%, rgba(0,0,0,0.8) 100%); 
+      border-radius: 8px; margin-bottom: 20px; outline: none; border: 1px solid rgba(255,255,255,0.05);
+    }
+    .asset-title { font-size: 1rem; font-weight: 500; margin: 0 0 16px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
     
-    .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    .btn-group { display: flex; gap: 10px; margin-bottom: 0; }
     .btn-secondary { 
-      background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); 
-      padding: 8px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; flex: 1; font-size: 0.8rem; transition: 0.2s;
+      background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); 
+      padding: 10px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; flex: 1; font-size: 0.8rem; transition: 0.3s;
     }
-    .btn-secondary:hover { background: var(--bg-surface-hover); border-color: var(--text-muted); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--text-main); }
     
     .btn-danger { 
-      background: transparent; color: var(--danger); border: 1px solid var(--border-color); 
-      padding: 8px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; width: 100%; font-size: 0.8rem; transition: 0.2s;
+      background: transparent; color: var(--danger); border: 1px solid rgba(255, 42, 95, 0.3); 
+      padding: 10px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; width: 100%; font-size: 0.8rem; transition: 0.3s;
     }
-    .btn-danger:hover { border-color: var(--danger); }
+    .btn-danger:hover { background: rgba(255, 42, 95, 0.1); border-color: var(--danger); box-shadow: 0 0 10px rgba(255, 42, 95, 0.2); }
 
-    .status-msg { padding: 12px 16px; border-radius: 6px; font-weight: 500; margin-top: 16px; font-size: 0.85rem; border: 1px solid transparent; }
-    .success { background: rgba(0, 112, 243, 0.1); color: var(--accent); border-color: rgba(0, 112, 243, 0.2); }
-    .error { background: rgba(238, 0, 0, 0.1); color: var(--danger); border-color: rgba(238, 0, 0, 0.2); }
-    .loading { background: var(--bg-surface); color: var(--text-main); border-color: var(--border-color); }
+    /* Status Messages */
+    .status-msg { padding: 12px 16px; border-radius: 8px; font-weight: 500; margin-top: 20px; font-size: 0.85rem; border: 1px solid transparent; letter-spacing: 0.5px; }
+    .success { background: rgba(180, 255, 0, 0.1); color: var(--primary); border-color: var(--primary); }
+    .error { background: rgba(255, 42, 95, 0.1); color: var(--danger); border-color: var(--danger); }
+    .loading { background: rgba(0, 229, 255, 0.1); color: var(--accent); border-color: var(--accent); }
 
     #appContainer { display: none; }
   </style>
@@ -163,34 +216,34 @@
   <div class="section-box" id="authContainer">
     <div class="section-header">
       <h2>Welcome Back</h2>
-      <p>Log in to your AR workspace.</p>
+      <p>Initiate secure connection to your AR workspace.</p>
     </div>
     
     <div class="auth-tabs">
-      <div class="auth-tab active" id="tabLogin" onclick="setMode('login')">Login</div>
-      <div class="auth-tab" id="tabRegister" onclick="setMode('register')">Register</div>
+      <div class="auth-tab active" id="tabLogin" onclick="setMode('login')">LOGIN</div>
+      <div class="auth-tab" id="tabRegister" onclick="setMode('register')">REGISTER</div>
     </div>
     
     <form id="authForm">
       <div class="input-group">
         <label>Email Address</label>
-        <input type="email" id="authEmail" placeholder="you@example.com" required>
+        <input type="email" id="authEmail" placeholder="operator@creartor.ar" required>
       </div>
       <div class="input-group">
-        <label>Password</label>
+        <label>Security Key</label>
         <input type="password" id="authPassword" placeholder="••••••••" required minlength="6">
       </div>
-      <button type="submit" class="btn-primary" id="authSubmitBtn">Continue</button>
+      <button type="submit" class="btn-primary" id="authSubmitBtn">INITIALIZE</button>
     </form>
     <div id="authStatus"></div>
   </div>
 
   <div class="container" id="appContainer">
     
-    <div id="sharedBanner" class="section-box" style="display:none; border-color: var(--accent);">
-      <div class="section-header">
-        <h2 style="color: var(--text-main);">Shared Object</h2>
-        <p>Someone shared this 3D model with you.</p>
+    <div id="sharedBanner" class="section-box" style="display:none; border-color: var(--accent); box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);">
+      <div class="section-header" style="border-bottom-color: rgba(0, 229, 255, 0.2);">
+        <h2 style="color: var(--accent); text-shadow: 0 0 10px rgba(0, 229, 255, 0.4);">Incoming Transmission</h2>
+        <p>A 3D asset has been securely shared with your workspace.</p>
       </div>
       <div id="sharedContent"></div>
     </div>
@@ -198,34 +251,35 @@
     <div class="section-box">
       <div class="section-header">
         <h2>Deploy Asset</h2>
-        <p>Upload a new .glb or .gltf 3D model to your repository.</p>
+        <p>Upload a new .glb or .gltf 3D model payload to your repository.</p>
       </div>
       <form id="uploadForm">
         <div class="input-group">
-          <label>Asset Name</label>
-          <input type="text" id="assetName" placeholder="e.g. Vintage Car 356" required>
+          <label>Asset Designation</label>
+          <input type="text" id="assetName" placeholder="e.g. MK-VII Cyber Suit" required>
         </div>
         <div class="input-group">
-          <label>File Upload</label>
+          <label>Payload File</label>
           <div class="file-upload-wrapper">
             <div class="file-upload-btn">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              <span id="fileNameDisplay">Click or drag file to upload</span>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <span id="fileNameDisplay">Click to browse or drag file here</span>
             </div>
             <input type="file" id="assetFile" accept=".glb,.gltf" required>
           </div>
         </div>
-        <button type="submit" class="btn-primary" id="uploadBtn">Upload Asset</button>
+        <button type="submit" class="btn-primary" id="uploadBtn">TRANSMIT ASSET</button>
       </form>
       <div id="uploadStatus"></div>
     </div>
 
-    <div class="section-box" style="border:none; padding: 0; background: transparent;">
+    <div class="section-box" style="border:none; padding: 0; background: transparent; box-shadow: none;">
       <div class="section-header">
         <h2>My Repository</h2>
-        <p>Manage your uploaded 3D assets.</p>
+        <p>Manage and monitor your deployed 3D payloads.</p>
       </div>
-      <div id="libraryContainer"></div>
+      <div id="libraryContainer" class="library-grid">
+        </div>
     </div>
   </div>
 
@@ -237,4 +291,23 @@
     let authMode = 'login'; 
 
     const authContainer = document.getElementById('authContainer');
-    const appContainer
+    // FIXED: The line below was cut off in your original code. I closed it properly.
+    const appContainer = document.getElementById('appContainer');
+
+    // --- Tambahkan logika JavaScript aplikasi Anda (Login, Upload, Fetch Supabase) di bawah sini ---
+    
+    // Contoh script untuk mengganti nama file saat dipilih agar UX upload lebih baik
+    document.getElementById('assetFile').addEventListener('change', function(e) {
+      const fileNameDisplay = document.getElementById('fileNameDisplay');
+      if (this.files && this.files.length > 0) {
+        fileNameDisplay.textContent = "Selected: " + this.files[0].name;
+        fileNameDisplay.style.color = "var(--primary)";
+      } else {
+        fileNameDisplay.textContent = "Click to browse or drag file here";
+        fileNameDisplay.style.color = "var(--text-muted)";
+      }
+    });
+
+  </script>
+</body>
+</html>
