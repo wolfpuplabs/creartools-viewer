@@ -1070,8 +1070,10 @@ function launchAR(){
 }
 
 /* ===================== SHARE ===================== */
+let shareToken=0;
 async function openShare(id){
   const a=assets.find(x=>x.id===(id||activeId)); if(!a){ toast('Load an asset first'); return; }
+  const myToken=++shareToken;            // invalidate any in-flight previous build
   const params=new URLSearchParams(); params.set('name',a.name);
   if(a.src) params.set('model',a.src);
   if(a.iosSrc) params.set('ios',a.iosSrc);
@@ -1079,11 +1081,13 @@ async function openShare(id){
   qrName=a.name;
   document.getElementById('shareLink').value=qrLink;
   document.getElementById('shareName').textContent=a.name;
+  // clear any previously drawn card so a stale image can't linger
+  try{ const cv=document.getElementById('qrCanvas'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }catch(e){}
   document.getElementById('shareModal').classList.add('show');
   const cl=document.getElementById('cardLoading'); cl.classList.add('show');
   const watchdog=setTimeout(()=>cl.classList.remove('show'), 9000); // never let it stick
-  try{ await buildShareCard(a); }catch(e){ /* fallback already drawn */ }
-  clearTimeout(watchdog); cl.classList.remove('show');
+  try{ await buildShareCard(a, myToken); }catch(e){ /* fallback already drawn */ }
+  clearTimeout(watchdog); if(myToken===shareToken) cl.classList.remove('show');
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
@@ -1143,19 +1147,26 @@ async function makeQRNode(link){
   return raw.querySelector('canvas') || raw.querySelector('img');
 }
 function withTimeout(p, ms){ return Promise.race([ Promise.resolve(p), new Promise(r=>setTimeout(()=>r(null), ms)) ]); }
-async function buildShareCard(a){
+async function buildShareCard(a, token){
+  const live=()=>token===undefined || token===shareToken;
   const qrNode = await makeQRNode(qrLink);
+  if(!live()) return;
   const meta={ qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
   await fontsReady();
+  if(!live()) return;
   // 1) draw the card right away with the QR + placeholder so it's never blank / stuck
   composeTradingCard({assetImg:null, ...meta});
   document.getElementById('cardLoading')?.classList.remove('show');
   // 2) fetch the best available render (each step capped so it can't hang), then redraw
   let img=null;
   if(a.id===activeId)            img = await withTimeout(captureStage(), 2500);
+  if(!live()) return;
   if(!img && posterCache[a.id])  img = await withTimeout(urlToImg(posterCache[a.id]), 2500);
+  if(!live()) return;
   if(!img && a.poster)           img = await withTimeout(urlToImg(a.poster), 3000);
+  if(!live()) return;
   if(!img && a.src)              img = await withTimeout(captureAsset(a.src), 5000);
+  if(!live()) return;
   if(img) composeTradingCard({assetImg:img, ...meta});
 }
 
