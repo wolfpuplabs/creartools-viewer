@@ -792,7 +792,7 @@ function renderRepo(){
 const posterCache={};
 let posterBusy=false; const posterQ=[]; let posterIO=null;
 // persist captured posters in the browser so thumbnails + share cards are instant next time (no re-render, no migration needed)
-function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0 && dataUrl.length<300000) localStorage.setItem('creartor_poster_'+id, dataUrl); }catch(e){} }
+function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0 && dataUrl.length<500000) localStorage.setItem('creartor_poster_'+id, dataUrl); }catch(e){} }
 function hydratePosters(){ try{ for(const a of assets){ if(!posterCache[a.id]){ const v=localStorage.getItem('creartor_poster_'+a.id); if(v) posterCache[a.id]=v; } } }catch(e){} }
 function dropPoster(id){ try{ localStorage.removeItem('creartor_poster_'+id); }catch(e){} }
 function observePosters(){
@@ -839,6 +839,24 @@ async function persistPoster(id, dataUrl){
     const r=await sb.from('assets').update({poster:purl}).eq('id',id);
     if(!r.error){ a.poster=purl; }   // column exists -> cached permanently
   }catch(e){ /* poster column may not exist yet; lazy capture still works */ }
+}
+// capture a poster from the main stage viewer once it has loaded (reuses its decode — no extra download/GPU cost)
+function capturePosterFromStage(id){
+  const v=document.getElementById('stageViewer'); if(!v) return;
+  let done=false;
+  const grab=async()=>{
+    if(done) return; done=true; v.removeEventListener('load',grab);
+    await new Promise(r=>setTimeout(r,180));
+    try{
+      const url=v.toDataURL ? v.toDataURL('image/webp',0.85) : null;
+      if(url && url.length>200){
+        posterCache[id]=url; savePoster(id,url);
+        const w=document.getElementById('thwrap-'+id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
+        persistPoster(id,url);
+      }
+    }catch(e){}
+  };
+  if(v.loaded) grab(); else { v.addEventListener('load',grab,{once:true}); setTimeout(grab,12000); }
 }
 function captureThumb(src){
   return new Promise(resolve=>{
@@ -982,12 +1000,8 @@ async function deploy(){
     const r=ins.data;
     assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null});
     renderRepo(); loadAsset(r.id);
-    // render a thumbnail poster from the local file (no re-download) and store it permanently
-    try{
-      const durl=await captureThumb(previewGlbUrl||url);
-      if(durl){ posterCache[r.id]=durl; savePoster(r.id,durl); renderRepo(); persistPoster(r.id,durl); }
-    }catch(e){}
     resetUpload();
+    capturePosterFromStage(r.id);  // grab the poster from the stage once it loads — no extra decode, doesn't block deploy
     toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
