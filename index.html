@@ -306,17 +306,17 @@
     .bg-scan,.scan-sweep{display:none}
     #bootFx.run{animation-duration:.4s}
   }
-  /* anime speed-lines burst on AR */
-  #speedLines{position:fixed;inset:0;z-index:66;pointer-events:none;opacity:0;
+  /* anime speed-lines burst on AR — contained inside the viewport box */
+  .fx-lines{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;border-radius:inherit;
     background:repeating-conic-gradient(from 0deg at 50% 50%, rgba(205,242,74,0) 0deg, rgba(205,242,74,0) 2.1deg, rgba(205,242,74,.6) 2.1deg, rgba(205,242,74,.6) 3deg);
-    -webkit-mask:radial-gradient(circle at 50% 50%, transparent 22%, #000 56%);
-    mask:radial-gradient(circle at 50% 50%, transparent 22%, #000 56%);}
-  #speedLines.run{animation:speedZoom .72s ease-out}
-  @keyframes speedZoom{0%{opacity:0;transform:scale(1.55) rotate(-2deg)}22%{opacity:1}100%{opacity:0;transform:scale(1) rotate(0deg)}}
+    -webkit-mask:radial-gradient(circle at 50% 50%, transparent 16%, #000 52%);
+    mask:radial-gradient(circle at 50% 50%, transparent 16%, #000 52%);}
+  .fx-lines.run{animation:speedZoom .72s ease-out}
+  @keyframes speedZoom{0%{opacity:0;transform:scale(1.5) rotate(-2deg)}22%{opacity:1}100%{opacity:0;transform:scale(1) rotate(0deg)}}
   .sndbtn{padding:9px 11px}
   .sndbtn.on{color:var(--signal);border-color:rgba(205,242,74,.4)}
 
-  @media (prefers-reduced-motion: reduce){ #speedLines{display:none} }
+  @media (prefers-reduced-motion: reduce){ .fx-lines{display:none} }
   /* drifting background nebula (spatial depth) */
   .bg-nebula{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;filter:blur(22px)}
   .bg-nebula span{position:absolute;border-radius:50%;mix-blend-mode:screen}
@@ -411,6 +411,7 @@
     <section class="stagewrap">
       <div class="stage">
         <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
+        <div class="fx-lines"></div>
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
@@ -511,6 +512,7 @@
   </header>
   <div class="sv-stage">
     <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
+    <div class="fx-lines"></div>
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
@@ -550,7 +552,6 @@
   </div>
 </div>
 
-<div id="speedLines"></div>
 <div id="bootFx"><div class="boot-line"></div><div class="boot-txt" id="bootTxt">SYSTEM ONLINE</div></div>
 <div id="toast"><span class="dot"></span><span id="toastMsg">Done</span></div>
 
@@ -933,7 +934,7 @@ function resetCam(){const v=document.getElementById('stageViewer');v.cameraOrbit
 function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
 function launchAR(){
   const v=document.getElementById('stageViewer');
-  speedLines(); sfxAR();
+  speedLines(document.querySelector('.stage')); sfxAR();
   setTimeout(()=>{ if(v.canActivateAR) v.activateAR(); else toast('Open on a mobile device to view in AR'); }, 240);
 }
 
@@ -1102,16 +1103,16 @@ function updateSoundBtn(){
   b.querySelector('.i-off').style.display = soundOn?'none':'block';
 }
 
-/* ---- anime speed-lines burst ---- */
-function speedLines(){
+/* ---- anime speed-lines burst (inside the given viewport box) ---- */
+function speedLines(scope){
   if(REDUCE_MOTION) return;
-  const el=document.getElementById('speedLines'); if(!el) return;
+  const el=(scope||document).querySelector('.fx-lines'); if(!el) return;
   el.classList.remove('run'); void el.offsetWidth; el.classList.add('run');
   setTimeout(()=>el.classList.remove('run'), 740);
 }
 function launchSharedAR(){
   const v=document.getElementById('sharedViewer');
-  speedLines(); sfxAR();
+  speedLines(document.querySelector('.sv-stage')); sfxAR();
   setTimeout(()=>{ if(v && v.activateAR) v.activateAR(); }, 240);
 }
 
