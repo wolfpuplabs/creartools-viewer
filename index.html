@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Creartor AR — Spatial Workspace</title>
 
+<!-- App icons / favicon -->
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+<!-- Add to Home Screen / install -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0a0a0c" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Creartor AR" />
+
 <!-- ============================================================
      SETUP (one time): run supabase-setup.sql in your Supabase SQL
      Editor (it adds the GLB + USDZ columns), keep the PUBLIC bucket
@@ -156,7 +170,7 @@
   .asset:hover{border-color:var(--line-strong);transform:translateX(2px)}
   .asset.active{border-color:rgba(205,242,74,.5);background:rgba(205,242,74,.05)}
   .asset.active::before{content:"";position:absolute;left:0;top:14%;bottom:14%;width:3px;border-radius:3px;background:var(--signal)}
-  .thumb{width:58px;height:58px;border-radius:10px;flex-shrink:0;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.18), transparent 60%),linear-gradient(160deg,#16161c,#0c0c10);border:1px solid var(--line);display:grid;place-items:center}
+  .thumb{width:68px;height:68px;border-radius:11px;flex-shrink:0;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 120%, rgba(205,242,74,.18), transparent 60%),linear-gradient(160deg,#16161c,#0c0c10);border:1px solid var(--line);display:grid;place-items:center}
   .thumb svg{width:26px;height:26px;color:var(--text-3)}
   .thumb model-viewer{position:absolute;inset:0}
   .thumb-play{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;background:rgba(10,10,12,.4);color:var(--signal);border:none;cursor:pointer;transition:background .2s}
@@ -170,6 +184,15 @@
   .thumb .anim-dot{position:absolute;top:5px;right:5px;z-index:3;width:6px;height:6px;border-radius:50%;background:var(--signal);box-shadow:0 0 8px var(--signal);display:none}
   .thumb.anim .anim-dot{display:block}
   .tool.hidden{display:none}
+  .anim-ctrls{display:none;align-items:center;gap:5px;margin-top:8px}
+  .anim-ctrls.show{display:flex}
+  .ac-btn{width:27px;height:27px;border-radius:7px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line);background:var(--bg);transition:.16s var(--ease)}
+  .ac-btn svg{width:13px;height:13px}
+  .ac-btn:hover{color:var(--text);border-color:var(--line-strong);background:var(--surface-3)}
+  .ac-btn.active{background:var(--signal);color:#0a0a0c;border-color:transparent}
+  .ac-btn .i-pause{display:none}
+  .ac-btn.playing .i-play{display:none}
+  .ac-btn.playing .i-pause{display:block}
   .asset .meta{flex:1;min-width:0}
   .asset .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
   .asset .meta .sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-3);margin-top:3px}
@@ -292,6 +315,8 @@
               <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
               <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
             </button>
+            <button class="tool active hidden" id="loopBtn" title="Loop animation" onclick="toggleLoop()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></button>
+            <button class="tool hidden" id="animResetBtn" title="Restart animation" onclick="resetAnim()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4v16"/><path d="M20 4 L8 12 L20 20 Z"/></svg></button>
             <button class="tool" title="Reset camera" onclick="resetCam()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
             <button class="tool" title="Fullscreen" onclick="fullscreen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
             <button class="tool ar" title="View in AR" onclick="launchAR()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>AR</button>
@@ -519,28 +544,61 @@ function renderRepo(){
       <div class="meta">
         <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</span>${a.iosSrc?'<span class="badge-ios">iOS AR</span>':''}</div>
         <div class="sub">${a.src?a.fmt:'USDZ'} · ${a.size}</div>
+        ${a.src?`<div class="anim-ctrls" id="ctrls-${a.id}">
+          <button class="ac-btn" id="acplay-${a.id}" title="Play / pause" onclick="event.stopPropagation();thumbPlay('${a.id}')"><svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></button>
+          <button class="ac-btn active" id="acloop-${a.id}" title="Loop on / off" onclick="thumbLoop(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+          <button class="ac-btn" title="Restart timeline" onclick="thumbReset(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.5 8a9 9 0 1 0 2-3.3L3 8"/></svg></button>
+        </div>`:''}
       </div>
       <div class="acts">
         <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
         <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
       </div>
     </div>`).join('');
-  // detect which thumbnails are animated -> reveal the play badge
+  // detect which thumbnails are animated -> reveal play / loop / reset controls
   assets.forEach(a=>{
     if(!a.src) return;
     const mv=document.getElementById('th-'+a.id);
     if(!mv) return;
     mv.addEventListener('load',()=>{
-      try{ if(mv.availableAnimations && mv.availableAnimations.length){ document.getElementById('thwrap-'+a.id)?.classList.add('anim'); mv.pause(); } }catch(e){}
+      try{
+        if(mv.availableAnimations && mv.availableAnimations.length){
+          document.getElementById('thwrap-'+a.id)?.classList.add('anim');
+          document.getElementById('ctrls-'+a.id)?.classList.add('show');
+          mv.dataset.loop='1';
+          mv.pause();
+        }
+      }catch(e){}
     },{once:true});
+    mv.addEventListener('finished',()=>syncThumb(a.id,false)); // loop-off animation reached its end
   });
 }
-function toggleThumb(e,id){
+function thumbMV(id){ return document.getElementById('th-'+id); }
+function thumbAnimated(mv){ return mv && mv.availableAnimations && mv.availableAnimations.length>0; }
+function syncThumb(id,playing){
+  document.getElementById('thwrap-'+id)?.classList.toggle('playing',playing);
+  document.getElementById('acplay-'+id)?.classList.toggle('playing',playing);
+}
+function thumbToggle(id){
+  const mv=thumbMV(id); if(!mv) return;
+  if(!thumbAnimated(mv)){ loadAsset(id); return; }            // not animated -> just open it
+  if(mv.paused){ mv.play({repetitions: mv.dataset.loop==='0'?1:Infinity}); syncThumb(id,true); }
+  else { mv.pause(); syncThumb(id,false); }
+}
+function toggleThumb(e,id){ e.stopPropagation(); thumbToggle(id); }   // tap on the thumbnail itself
+function thumbPlay(id){ thumbToggle(id); }                            // play/pause control button
+function thumbLoop(e,id){
   e.stopPropagation();
-  const wrap=document.getElementById('thwrap-'+id), mv=document.getElementById('th-'+id);
-  if(!mv) return;
-  if(!(mv.availableAnimations && mv.availableAnimations.length)){ loadAsset(id); return; }
-  if(mv.paused){ mv.play(); wrap.classList.add('playing'); } else { mv.pause(); wrap.classList.remove('playing'); }
+  const mv=thumbMV(id); if(!mv) return;
+  const on = mv.dataset.loop!=='0';        // currently looping?
+  mv.dataset.loop = on?'0':'1';            // toggle loop
+  document.getElementById('acloop-'+id)?.classList.toggle('active', !on);
+  if(!mv.paused) mv.play({repetitions: on?1:Infinity}); // re-apply to the running animation
+}
+function thumbReset(e,id){
+  e.stopPropagation();
+  const mv=thumbMV(id); if(!mv) return;
+  try{ mv.currentTime=0; }catch(_){}       // rewind timeline to the start
 }
 function loadAsset(id){
   const a=assets.find(x=>x.id===id); if(!a) return;
@@ -651,11 +709,12 @@ function resetUpload(){
 
 /* ===================== VIEWPORT TOOLS ===================== */
 let rotating=true;
+let stageLoop=true;
 function updateAnimBtn(){
-  const v=document.getElementById('stageViewer'), b=document.getElementById('animBtn');
+  const v=document.getElementById('stageViewer');
   const has = v.availableAnimations && v.availableAnimations.length>0;
-  b.classList.toggle('hidden', !has);
-  if(has) setAnimIcon(!v.paused);
+  ['animBtn','loopBtn','animResetBtn'].forEach(id=>document.getElementById(id).classList.toggle('hidden', !has));
+  if(has){ setAnimIcon(!v.paused); document.getElementById('loopBtn').classList.toggle('active', stageLoop); }
 }
 function setAnimIcon(playing){
   const b=document.getElementById('animBtn');
@@ -666,8 +725,15 @@ function setAnimIcon(playing){
 function toggleAnim(){
   const v=document.getElementById('stageViewer');
   if(!(v.availableAnimations && v.availableAnimations.length)) return;
-  if(v.paused){ v.play(); setAnimIcon(true); } else { v.pause(); setAnimIcon(false); }
+  if(v.paused){ v.play({repetitions: stageLoop?Infinity:1}); setAnimIcon(true); } else { v.pause(); setAnimIcon(false); }
 }
+function toggleLoop(){
+  stageLoop=!stageLoop;
+  document.getElementById('loopBtn').classList.toggle('active', stageLoop);
+  const v=document.getElementById('stageViewer');
+  if(v.availableAnimations && v.availableAnimations.length && !v.paused){ v.play({repetitions: stageLoop?Infinity:1}); }
+}
+function resetAnim(){ const v=document.getElementById('stageViewer'); try{ v.currentTime=0; }catch(_){} }
 function toggleRotate(){
   rotating=!rotating;
   const v=document.getElementById('stageViewer'),b=document.getElementById('rotBtn');
@@ -717,6 +783,8 @@ let toastTimer;
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3200)}
 document.getElementById('shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')closeShare()});
 document.getElementById('stageViewer').addEventListener('load', updateAnimBtn);
+document.getElementById('stageViewer').addEventListener('finished', ()=>setAnimIcon(false));
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
 ['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
 </script>
