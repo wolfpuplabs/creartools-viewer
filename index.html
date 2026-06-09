@@ -382,7 +382,7 @@
   @keyframes lblBlink{50%{opacity:.28}}
 
   @media (prefers-reduced-motion: reduce){ #loaderCube,.lo-cube,#loaderPath,.lo-path,.lo-orbit,.lo-label{animation:none!important} }
-  .thumb-img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
+  .thumb-img{width:100%;height:100%;object-fit:contain;display:block;border-radius:inherit;padding:3px}
 
   /* low-FX mode (iOS / small screens / reduced-motion): drop the GPU-heavy effects */
   body.lowfx .bg-nebula{display:none}
@@ -747,6 +747,8 @@ async function loadAssets(){
       return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath,poster:r.poster||null};
     });
   }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
+  // one-time: discard posters captured at the old (side) angle so they re-render facing front
+  try{ if(localStorage.getItem('creartor_posterAngle')!=='front'){ assets.forEach(a=>{ a.poster=null; }); localStorage.setItem('creartor_posterAngle','front'); } }catch(e){}
   renderRepo();
   if(assets[0]) loadAsset(assets[0].id); else showSample();
 }
@@ -816,7 +818,7 @@ async function persistPoster(id, dataUrl){
     const path=`${user.id}/poster-${id}.webp`;
     const up=await sb.storage.from(BUCKET).upload(path, blob, {contentType:'image/webp', upsert:true});
     if(up.error) return;
-    const purl=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const purl=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl + '?v=' + Date.now(); // bust CDN/browser cache on re-capture
     const r=await sb.from('assets').update({poster:purl}).eq('id',id);
     if(!r.error){ a.poster=purl; }   // column exists -> cached permanently
   }catch(e){ /* poster column may not exist yet; lazy capture still works */ }
@@ -827,7 +829,7 @@ function captureThumb(src){
     let done=false; const fin=v=>{ if(done)return; done=true; mv.removeEventListener('load',onLoad); try{mv.removeAttribute('src')}catch(e){}; resolve(v); };
     const onLoad=async()=>{ await new Promise(r=>setTimeout(r,220)); try{ const u=mv.toDataURL('image/webp',0.82); fin(u&&u.length>200?u:null); }catch(e){ fin(null); } };
     mv.addEventListener('load',onLoad);
-    mv.setAttribute('camera-orbit','-18deg 76deg auto'); mv.setAttribute('src',src);
+    mv.setAttribute('camera-orbit','0deg 85deg auto'); mv.setAttribute('src',src);
     setTimeout(()=>fin(null),9000);
   });
 }
@@ -1085,7 +1087,7 @@ function captureAsset(src){
       }catch(e){ finish(null); }
     };
     mv.addEventListener('load',onLoad);
-    mv.setAttribute('camera-orbit','-20deg 78deg auto');
+    mv.setAttribute('camera-orbit','0deg 85deg auto');
     mv.setAttribute('src',src);
     setTimeout(()=>finish(null), 7000);
   });
