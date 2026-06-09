@@ -747,6 +747,7 @@ async function loadAssets(){
       return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath,poster:r.poster||null};
     });
   }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
+  hydratePosters();   // instant thumbnails/cards from previously saved posters
   renderRepo();
   if(assets[0]) loadAsset(assets[0].id); else showSample();
 }
@@ -790,6 +791,10 @@ function renderRepo(){
 /* ---- lightweight repo thumbnails: render a poster once, one viewer at a time ---- */
 const posterCache={};
 let posterBusy=false; const posterQ=[]; let posterIO=null;
+// persist captured posters in the browser so thumbnails + share cards are instant next time (no re-render, no migration needed)
+function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0 && dataUrl.length<300000) localStorage.setItem('creartor_poster_'+id, dataUrl); }catch(e){} }
+function hydratePosters(){ try{ for(const a of assets){ if(!posterCache[a.id]){ const v=localStorage.getItem('creartor_poster_'+a.id); if(v) posterCache[a.id]=v; } } }catch(e){} }
+function dropPoster(id){ try{ localStorage.removeItem('creartor_poster_'+id); }catch(e){} }
 function observePosters(){
   const need=a=>a.src && !(a.poster||posterCache[a.id]);
   if(!('IntersectionObserver' in window)){ assets.forEach(a=>{ if(need(a)) queuePoster(a.id,a.src); }); return; }
@@ -802,7 +807,7 @@ function queuePoster(id,src){ if(!src||posterCache[id]||posterQ.some(q=>q.id===i
 function regenPoster(e,id){
   if(e) e.stopPropagation();
   const a=assets.find(x=>x.id===id); if(!a||!a.src) return;
-  a.poster=null; delete posterCache[id];
+  a.poster=null; delete posterCache[id]; dropPoster(id);
   const w=document.getElementById('thwrap-'+id);
   if(w) w.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>';
   toast('Regenerating thumbnail…');
@@ -815,9 +820,9 @@ async function drainPosters(){
   const job=posterQ.shift(); if(!job) return; posterBusy=true;
   const url=await captureThumb(job.src);
   if(url){
-    posterCache[job.id]=url;
+    posterCache[job.id]=url; savePoster(job.id,url);
     const w=document.getElementById('thwrap-'+job.id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
-    persistPoster(job.id, url);   // upload once so it never needs re-rendering
+    persistPoster(job.id, url);   // also upload (best-effort) for cross-device persistence
   }
   posterBusy=false; setTimeout(drainPosters,260); // breathing room so memory can settle between large GLBs
 }
@@ -980,7 +985,7 @@ async function deploy(){
     // render a thumbnail poster from the local file (no re-download) and store it permanently
     try{
       const durl=await captureThumb(previewGlbUrl||url);
-      if(durl){ posterCache[r.id]=durl; renderRepo(); persistPoster(r.id,durl); }
+      if(durl){ posterCache[r.id]=durl; savePoster(r.id,durl); renderRepo(); persistPoster(r.id,durl); }
     }catch(e){}
     resetUpload();
     toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
