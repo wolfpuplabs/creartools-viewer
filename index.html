@@ -791,6 +791,7 @@ function renderRepo(){
 /* ---- lightweight repo thumbnails: render a poster once, one viewer at a time ---- */
 const posterCache={};
 let posterBusy=false; const posterQ=[]; let posterIO=null;
+let stageBusy=false;   // true while the main viewport is loading a model — pause background thumbnail renders
 // persist captured posters in the browser so thumbnails + share cards are instant next time (no re-render, no migration needed)
 function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0 && dataUrl.length<500000) localStorage.setItem('creartor_poster_'+id, dataUrl); }catch(e){} }
 function hydratePosters(){ try{ for(const a of assets){ if(!posterCache[a.id]){ const v=localStorage.getItem('creartor_poster_'+a.id); if(v) posterCache[a.id]=v; } } }catch(e){} }
@@ -815,8 +816,8 @@ function regenPoster(e,id){
 }
 async function drainPosters(){
   if(posterBusy) return;
-  // don't load a model in the background while a share card is being built / shown
-  if(document.getElementById('shareModal')?.classList.contains('show')){ setTimeout(drainPosters,600); return; }
+  // give the main viewport priority — don't decode a background model while the stage is loading or a card is open
+  if(stageBusy || document.getElementById('shareModal')?.classList.contains('show')){ setTimeout(drainPosters,600); return; }
   const job=posterQ.shift(); if(!job) return; posterBusy=true;
   const url=await captureThumb(job.src);
   if(url){
@@ -873,10 +874,13 @@ function loadAsset(id){
   activeId=id;
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
   if(a.src){
+    stageBusy=true;
+    try{ document.getElementById('posterMV').removeAttribute('src'); }catch(e){} // free the background renderer so the stage loads first
     v.style.display=''; empty.style.display='none'; showLoader();
     v.setAttribute('src',a.src);
     document.getElementById('nowDim').textContent='loading…';
     v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
+    clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000); // never leave the loader stuck
   }else{
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
     document.getElementById('nowDim').textContent='AR-only';
@@ -1143,9 +1147,14 @@ async function captureStage(){
 // generate a QR node (canvas/img) for the link
 async function makeQRNode(link){
   const raw=document.getElementById('qrRaw'); raw.innerHTML='';
-  if(window.QRCode){ new QRCode(raw,{text:link,width:380,height:380,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }
-  await new Promise(r=>setTimeout(r,80));
-  return raw.querySelector('canvas') || raw.querySelector('img');
+  try{ if(window.QRCode) new QRCode(raw,{text:link,width:380,height:380,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }catch(e){}
+  await new Promise(r=>setTimeout(r,60));
+  const node = raw.querySelector('canvas') || raw.querySelector('img');
+  // qrcodejs may produce an <img> (data URL) that isn't decoded yet — wait so drawImage isn't blank
+  if(node && node.tagName==='IMG' && !node.complete){
+    await new Promise(res=>{ node.onload=res; node.onerror=res; setTimeout(res,700); });
+  }
+  return node;
 }
 function withTimeout(p, ms){ return Promise.race([ Promise.resolve(p), new Promise(r=>setTimeout(()=>r(null), ms)) ]); }
 async function buildShareCard(a, token, meta){
@@ -1544,7 +1553,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3200)}
 document.getElementById('shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')closeShare()});
-document.getElementById('stageViewer').addEventListener('load', ()=>{ updateAnimBtn(); hideLoader(); });
+document.getElementById('stageViewer').addEventListener('load', ()=>{ updateAnimBtn(); hideLoader(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters(); });
 document.getElementById('stageViewer').addEventListener('finished', ()=>setAnimIcon(false));
 document.getElementById('stageViewer').addEventListener('progress', e=>{
   const p=Math.round((e.detail.totalProgress||0)*100);
@@ -1552,7 +1561,7 @@ document.getElementById('stageViewer').addEventListener('progress', e=>{
   if(pct) pct.textContent=p+'%';
   if(fill) fill.style.width=p+'%';
 });
-document.getElementById('stageViewer').addEventListener('error', ()=>hideLoader());
+document.getElementById('stageViewer').addEventListener('error', ()=>{ hideLoader(); stageBusy=false; clearTimeout(window.__stageWD); toast('Could not load this model'); drainPosters(); });
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
 ['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
