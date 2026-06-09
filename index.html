@@ -317,11 +317,38 @@
   .sndbtn.on{color:var(--signal);border-color:rgba(205,242,74,.4)}
 
   @media (prefers-reduced-motion: reduce){ #speedLines{display:none} }
+  /* drifting background nebula (spatial depth) */
+  .bg-nebula{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;filter:blur(22px)}
+  .bg-nebula span{position:absolute;border-radius:50%;mix-blend-mode:screen}
+  .bg-nebula span:nth-child(1){width:66vw;height:66vw;left:-12vw;top:-8vh;opacity:.16;background:radial-gradient(circle,#1d6f54,transparent 62%);animation:neb1 46s ease-in-out infinite}
+  .bg-nebula span:nth-child(2){width:58vw;height:58vw;right:-14vw;bottom:-10vh;opacity:.14;background:radial-gradient(circle,#34407e,transparent 62%);animation:neb2 58s ease-in-out infinite}
+  .bg-nebula span:nth-child(3){width:42vw;height:42vw;left:30vw;top:35vh;opacity:.12;background:radial-gradient(circle,#9bbe2e,transparent 60%);animation:neb1 64s ease-in-out infinite reverse}
+  @keyframes neb1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,5vh) scale(1.15)}}
+  @keyframes neb2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,-4vh) scale(1.12)}}
+
+  /* in-viewport spatial depth: holo floor + drifting dust */
+  .stage-depth,.sv-stage .stage-depth{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .stage-floor{position:absolute;left:-30%;right:-30%;bottom:-12%;height:62%;
+    background:linear-gradient(rgba(205,242,74,.16) 1px,transparent 1px) 0 0/44px 44px,
+               linear-gradient(90deg,rgba(205,242,74,.16) 1px,transparent 1px) 0 0/44px 44px;
+    transform:perspective(440px) rotateX(70deg);transform-origin:bottom center;
+    -webkit-mask:linear-gradient(to top,#000 2%,rgba(0,0,0,.45) 38%,transparent 78%);
+    mask:linear-gradient(to top,#000 2%,rgba(0,0,0,.45) 38%,transparent 78%);
+    animation:floorScroll 7s linear infinite;opacity:.5}
+  @keyframes floorScroll{from{background-position:0 0,0 0}to{background-position:0 44px,0 44px}}
+  .stage-glow{position:absolute;left:50%;bottom:4%;width:72%;height:42%;transform:translateX(-50%);
+    background:radial-gradient(ellipse at center,rgba(205,242,74,.14),transparent 70%);filter:blur(6px)}
+  .stage-depth .sdot{position:absolute;width:2px;height:2px;border-radius:50%;background:#cdf24a;opacity:0;
+    box-shadow:0 0 6px rgba(205,242,74,.55);animation:sdotFloat linear infinite}
+  @keyframes sdotFloat{0%{transform:translate(0,0) scale(.55);opacity:0}15%{opacity:var(--op,.5)}85%{opacity:calc(var(--op,.5) * .5)}100%{transform:translate(var(--dx,0), calc(-1 * var(--rise,520px))) scale(1.05);opacity:0}}
+
+  @media (prefers-reduced-motion: reduce){ .bg-nebula span,.stage-floor,.stage-depth .sdot{animation:none!important} }
 </style>
 </head>
 <body>
 
 <div class="bg-glow"></div>
+<div class="bg-nebula"><span></span><span></span><span></span></div>
 <div class="bg-scan"></div>
 <div class="fx-particles" id="fxParticles"></div>
 <div class="bg-grid"></div>
@@ -383,6 +410,7 @@
   <main>
     <section class="stagewrap">
       <div class="stage">
+        <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
@@ -482,6 +510,7 @@
     <button class="btn btn-ghost" onclick="goWorkspace()" style="padding:9px 16px">Open workspace →</button>
   </header>
   <div class="sv-stage">
+    <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
@@ -1110,6 +1139,26 @@ function decodeText(el, text, dur){
   };
   el._raf=requestAnimationFrame(tick);
 }
+function makeStageDots(){
+  if(REDUCE_MOTION) return;
+  document.querySelectorAll('.stage-depth').forEach(box=>{
+    if(box.dataset.dots) return; box.dataset.dots='1';
+    for(let i=0;i<10;i++){
+      const d=document.createElement('span'); d.className='sdot';
+      const sz=(1.4+Math.random()*1.8).toFixed(1)+'px';
+      d.style.width=d.style.height=sz;
+      d.style.left=(8+Math.random()*84)+'%';
+      d.style.bottom=(Math.random()*42)+'%';
+      const dur=(7+Math.random()*8).toFixed(1);
+      d.style.animationDuration=dur+'s';
+      d.style.animationDelay=(-Math.random()*dur)+'s';
+      d.style.setProperty('--op',(0.25+Math.random()*0.45).toFixed(2));
+      d.style.setProperty('--dx',((Math.random()*2-1)*26).toFixed(0)+'px');
+      d.style.setProperty('--rise',(360+Math.random()*340).toFixed(0)+'px');
+      box.appendChild(d);
+    }
+  });
+}
 function makeParticles(){
   if(REDUCE_MOTION) return;
   const box=document.getElementById('fxParticles'); if(!box || box.childElementCount) return;
@@ -1136,6 +1185,7 @@ function bootFx(){
   setTimeout(()=>el.classList.remove('run'), 1300);
 }
 makeParticles();
+makeStageDots();
 updateSoundBtn();
 
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9.]+/g,'-').replace(/^-|-$/g,'')}
