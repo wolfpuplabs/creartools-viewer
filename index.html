@@ -1060,9 +1060,10 @@ async function openShare(id){
   document.getElementById('shareLink').value=qrLink;
   document.getElementById('shareName').textContent=a.name;
   document.getElementById('shareModal').classList.add('show');
-  document.getElementById('cardLoading').classList.add('show');
+  const cl=document.getElementById('cardLoading'); cl.classList.add('show');
+  const watchdog=setTimeout(()=>cl.classList.remove('show'), 9000); // never let it stick
   try{ await buildShareCard(a); }catch(e){ /* fallback already drawn */ }
-  document.getElementById('cardLoading').classList.remove('show');
+  clearTimeout(watchdog); cl.classList.remove('show');
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
@@ -1103,6 +1104,17 @@ function captureAsset(src){
     setTimeout(()=>finish(null), 7000);
   });
 }
+function blobToImg(blob){ return new Promise(res=>{ if(!blob){res(null);return;} const img=new Image(); img.onload=()=>res(img); img.onerror=()=>res(null); img.src=URL.createObjectURL(blob); }); }
+function urlToImg(url){ return new Promise(res=>{ if(!url){res(null);return;} const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>res(img); img.onerror=()=>res(null); img.src=url; }); }
+// grab the current frame from the live stage viewer (matches exactly what the user sees)
+async function captureStage(){
+  try{
+    const v=document.getElementById('stageViewer');
+    if(!v || typeof v.toBlob!=='function') return null;
+    const blob=await v.toBlob({mimeType:'image/png', idealAspect:false});
+    return await blobToImg(blob);
+  }catch(e){ return null; }
+}
 // generate a QR node (canvas/img) for the link
 async function makeQRNode(link){
   const raw=document.getElementById('qrRaw'); raw.innerHTML='';
@@ -1111,7 +1123,14 @@ async function makeQRNode(link){
   return raw.querySelector('canvas') || raw.querySelector('img');
 }
 async function buildShareCard(a){
-  const [assetImg, qrNode] = await Promise.all([ captureAsset(a.src), makeQRNode(qrLink) ]);
+  const qrNode = await makeQRNode(qrLink);
+  let assetImg=null;
+  // 1) live stage view when sharing the asset that's currently on screen (instant, no re-download)
+  if(a.id===activeId){ assetImg = await captureStage(); }
+  // 2) the saved thumbnail poster (already rendered facing front)
+  if(!assetImg && a.poster){ assetImg = await urlToImg(a.poster); }
+  // 3) last resort: render it in the hidden viewer (slower; may re-download)
+  if(!assetImg && a.src){ assetImg = await captureAsset(a.src); }
   await fontsReady();
   composeTradingCard({assetImg, qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ')});
 }
