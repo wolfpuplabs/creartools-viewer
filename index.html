@@ -1108,6 +1108,7 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   const DPR=2, W=430, H=602;
   c.width=W*DPR; c.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.clearRect(0,0,W,H);
+  const fit=(text,maxW,start,weight)=>{ let p=start; do{ ctx.font=`${weight} ${p}px "Syne", sans-serif`; if(ctx.measureText(text).width<=maxW) break; p-=1; }while(p>12); return p; };
 
   // ---- outer glowing gradient border ----
   const bg=ctx.createLinearGradient(0,0,W,H);
@@ -1115,79 +1116,80 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   roundRect(ctx,4,4,W-8,H-8,30); ctx.fillStyle=bg; ctx.fill();
 
   // ---- inner card ----
-  const ix=14, iy=14, iw=W-28, ih=H-28;
+  const ix=14, iy=14, iw=W-28, ih=H-28, rEdge=W-30;
   roundRect(ctx,ix,iy,iw,ih,22); ctx.save(); ctx.clip();
   const dark=ctx.createLinearGradient(0,iy,0,iy+ih); dark.addColorStop(0,'#191c24'); dark.addColorStop(.5,'#101218'); dark.addColorStop(1,'#0a0b10');
   ctx.fillStyle=dark; ctx.fillRect(ix,iy,iw,ih);
 
-  // subtle circuit traces
-  ctx.strokeStyle='rgba(80,200,230,.16)'; ctx.lineWidth=1.2; ctx.lineCap='round';
+  // subtle circuit traces (kept clear of the centre render)
+  ctx.strokeStyle='rgba(80,200,230,.15)'; ctx.lineWidth=1.2; ctx.lineCap='round';
   const trace=(pts)=>{ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke();
-    const e=pts[pts.length-1]; ctx.beginPath(); ctx.arc(e[0],e[1],2.4,0,7); ctx.fillStyle='rgba(80,200,230,.5)'; ctx.fill(); };
-  trace([[ix,120],[90,120],[120,150],[120,250]]);
-  trace([[ix+iw,180],[W-110,180],[W-150,220],[W-150,300]]);
-  trace([[ix,430],[70,430],[100,460],[230,460]]);
-  trace([[ix+iw,500],[W-60,500],[W-90,470],[W-150,470]]);
-  trace([[ix,330],[60,330],[80,350]]);
+    const e=pts[pts.length-1]; ctx.beginPath(); ctx.arc(e[0],e[1],2.2,0,7); ctx.fillStyle='rgba(80,200,230,.5)'; ctx.fill(); };
+  trace([[ix,150],[64,150],[88,174],[88,250]]);
+  trace([[ix+iw,150],[W-64,150],[W-88,174],[W-88,250]]);
+  trace([[ix,470],[60,470],[84,446],[150,446]]);
+  trace([[ix+iw,420],[W-56,420],[W-80,444]]);
 
   // top radial sheen
   const sheen=ctx.createRadialGradient(W/2,70,10,W/2,70,300); sheen.addColorStop(0,'rgba(120,170,255,.10)'); sheen.addColorStop(1,'rgba(120,170,255,0)');
   ctx.fillStyle=sheen; ctx.fillRect(ix,iy,iw,ih);
 
   // ---- header ----
-  // logo chip
-  roundRect(ctx,30,34,62,62,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
+  roundRect(ctx,30,30,60,60,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1.4; ctx.stroke();
-  cubeGlyph(ctx,61,65,1.7,2.4,'#ffffff');
-  // brand text
+  cubeGlyph(ctx,60,60,1.65,2.3,'#ffffff');
+  // brand title — auto-fit so it never clips the edge
+  const tx=104, titleMax=rEdge-tx;
+  const tp=fit('CREARTOR', titleMax, 32, '800');
   ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#ffffff';
-  ctx.font='800 33px "Syne", sans-serif'; ctx.fillText('CREARTOR', 108, 62);
-  ctx.fillStyle='rgba(255,255,255,.62)'; ctx.font='400 12px "Space Mono", monospace';
-  ctx.fillText('WEBAR VIEWER BY', 110, 80);
-  ctx.fillText('WOLFPUPLABS', 110, 95);
+  ctx.font=`800 ${tp}px "Syne", sans-serif`; ctx.fillText('CREARTOR', tx, 58);
+  ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='400 11.5px "Space Mono", monospace';
+  ctx.fillText('WEBAR VIEWER BY', tx+2, 75);
+  ctx.fillText('WOLFPUPLABS', tx+2, 90);
 
-  // ---- asset render (center) ----
-  const stageY=120, stageH=300;
-  // platform glow
-  const pg=ctx.createRadialGradient(W/2,stageY+stageH-30,8,W/2,stageY+stageH-30,180);
-  pg.addColorStop(0,'rgba(120,170,255,.22)'); pg.addColorStop(1,'rgba(120,170,255,0)');
-  ctx.fillStyle=pg; ctx.fillRect(ix,stageY,iw,stageH+40);
+  // ---- asset render (upper-centre, bounded so it can't touch the QR) ----
+  const stageY=108, stageH=276, baseY=stageY+stageH;
+  const pg=ctx.createRadialGradient(W/2,baseY-18,8,W/2,baseY-18,170);
+  pg.addColorStop(0,'rgba(120,170,255,.20)'); pg.addColorStop(1,'rgba(120,170,255,0)');
+  ctx.fillStyle=pg; ctx.fillRect(ix,stageY,iw,stageH+30);
   if(assetImg){
-    // contain the render within the stage area
-    const maxW=iw-60, maxH=stageH; const ar=assetImg.width/assetImg.height;
+    const maxW=iw-90, maxH=stageH, ar=assetImg.width/assetImg.height;
     let dw=maxW, dh=dw/ar; if(dh>maxH){ dh=maxH; dw=dh*ar; }
     ctx.drawImage(assetImg, W/2-dw/2, stageY+(stageH-dh)/2, dw, dh);
   } else {
     cubeGlyph(ctx, W/2, stageY+stageH/2, 5, 3, 'rgba(255,255,255,.5)');
   }
 
-  // ---- bottom-left info panel ----
-  const px=30, py=H-150, pw=210, ph=86;
+  // ===== bottom zone (info panel + QR, clearly separated) =====
+  // ---- QR (bottom-right) ----
+  const qs=116, qx=W-34-qs, qy=H-34-qs, qcx=qx+qs/2;
+  // label fully above the neon frame
+  ctx.textAlign='center'; ctx.fillStyle='#ffffff'; ctx.font='700 11px "Space Mono", monospace';
+  ctx.fillText('SCAN TO VIEW', qcx, qy-34);
+  ctx.fillText('AR SCENE',     qcx, qy-21);
+  const qf=ctx.createLinearGradient(qx,qy,qx+qs,qy+qs); qf.addColorStop(0,'#43e6f0'); qf.addColorStop(1,'#b15cff');
+  roundRect(ctx,qx-13,qy-13,qs+26,qs+26,15); ctx.fillStyle=qf; ctx.fill();
+  ctx.fillStyle='#ffffff'; roundRect(ctx,qx-9,qy-9,qs+18,qs+18,11); ctx.fill(); // white quiet zone
+  if(qrNode){ try{ ctx.drawImage(qrNode,qx,qy,qs,qs); }catch(e){} }
+  const lc=qs*0.17, lx=qcx, ly=qy+qs/2;
+  ctx.fillStyle='#ffffff'; roundRect(ctx,lx-lc/2,ly-lc/2,lc,lc,5); ctx.fill();
+  cubeGlyph(ctx, lx, ly, (lc*0.64)/20, 1.8, '#0a0a0c');
+
+  // ---- bottom-left info panel (aligned with QR, no overlap) ----
+  const pw=qx-13-30-14;            // stop 14px before the QR frame
+  const ph=92, px=30, py=qy+qs+13-ph;
   roundRect(ctx,px,py,pw,ph,14); ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1; ctx.stroke();
-  ctx.font='700 12px "Space Mono", monospace'; ctx.fillStyle='rgba(255,255,255,.5)'; ctx.textAlign='left';
-  ctx.fillText('MODEL', px+16, py+30);
-  ctx.fillText('SIZE',  px+16, py+62);
-  ctx.fillStyle='#ffffff'; ctx.font='700 14px "Space Mono", monospace';
-  let nm=(name||'model').toUpperCase(); if(nm.length>16) nm=nm.slice(0,15)+'…';
-  ctx.fillText(nm, px+74, py+30);
-  ctx.fillText((size||'—').toUpperCase(), px+74, py+62);
-
-  // ---- QR (bottom-right) ----
-  const qs=124, qx=W-30-qs, qy=H-30-qs-18;
-  ctx.textAlign='center'; ctx.fillStyle='#ffffff'; ctx.font='700 12px "Space Mono", monospace';
-  ctx.fillText('SCAN TO VIEW', qx+qs/2, qy-26);
-  ctx.fillText('AR SCENE', qx+qs/2, qy-11);
-  // neon frame
-  const qf=ctx.createLinearGradient(qx,qy,qx+qs,qy+qs); qf.addColorStop(0,'#43e6f0'); qf.addColorStop(1,'#b15cff');
-  roundRect(ctx,qx-16,qy-16,qs+32,qs+32,16); ctx.fillStyle=qf; ctx.fill();
-  // white plate with generous quiet zone (>=4 modules) so it scans when printed
-  ctx.fillStyle='#ffffff'; roundRect(ctx,qx-11,qy-11,qs+22,qs+22,11); ctx.fill();
-  if(qrNode){ try{ ctx.drawImage(qrNode,qx,qy,qs,qs); }catch(e){} }
-  // small logo chip in QR centre (kept small; QR uses high error-correction)
-  const lc=qs*0.18, lx=qx+qs/2, ly=qy+qs/2;
-  ctx.fillStyle='#ffffff'; roundRect(ctx,lx-lc/2,ly-lc/2,lc,lc,6); ctx.fill();
-  cubeGlyph(ctx, lx, ly, (lc*0.66)/20, 2, '#0a0a0c');
+  ctx.textAlign='left';
+  ctx.font='700 11px "Space Mono", monospace'; ctx.fillStyle='rgba(255,255,255,.5)';
+  ctx.fillText('MODEL', px+16, py+34);
+  ctx.fillText('SIZE',  px+16, py+66);
+  ctx.fillStyle='#ffffff'; ctx.font='700 13px "Space Mono", monospace';
+  let nm=(name||'model').toUpperCase(); const nmMax=px+pw-16;
+  while(nm.length>3 && (px+62+ctx.measureText(nm).width)>nmMax) nm=nm.slice(0,-1);
+  if(nm!==(name||'model').toUpperCase()) nm=nm.slice(0,-1)+'…';
+  ctx.fillText(nm, px+62, py+34);
+  ctx.fillText((size||'—').toUpperCase(), px+62, py+66);
 
   ctx.restore();
 }
