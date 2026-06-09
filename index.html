@@ -166,7 +166,7 @@
 
   .repo-list{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding-right:4px}
   .repo-list::-webkit-scrollbar{width:6px}.repo-list::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px}
-  .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden}
+  .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 92px}
   .asset:hover{border-color:var(--line-strong);transform:translateX(2px)}
   .asset.active{border-color:rgba(205,242,74,.5);background:rgba(205,242,74,.05)}
   .asset.active::before{content:"";position:absolute;left:0;top:14%;bottom:14%;width:3px;border-radius:3px;background:var(--signal)}
@@ -220,8 +220,11 @@
   .preview-info{flex:1;min-width:0}
   .preview-info .pv-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .preview-info .pv-sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.04em;color:var(--signal);margin-top:3px}
-  .qr-card-wrap{display:flex;justify-content:center}
-  #qrCanvas{width:232px;max-width:78%;height:auto;border-radius:18px;box-shadow:0 24px 60px -24px rgba(0,0,0,.8)}
+  .qr-card-wrap{display:flex;justify-content:center;position:relative}
+  #qrCanvas{width:268px;max-width:82%;height:auto;border-radius:18px;box-shadow:0 24px 60px -24px rgba(0,0,0,.85)}
+  #cardLoading{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-2);font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.2em}
+  #cardLoading.show{display:flex}
+  .card-spin{width:30px;height:30px;border:2.5px solid rgba(205,242,74,.2);border-top-color:var(--signal);border-radius:50%;animation:rot .8s linear infinite}
   .share-actions{display:flex;gap:8px}
   .linkrow input{flex:1;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);color:var(--text-2);font-family:"Space Mono",monospace;font-size:12px}
   .closeX{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line)}
@@ -379,6 +382,15 @@
   @keyframes lblBlink{50%{opacity:.28}}
 
   @media (prefers-reduced-motion: reduce){ #loaderCube,.lo-cube,#loaderPath,.lo-path,.lo-orbit,.lo-label{animation:none!important} }
+  .thumb-img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
+
+  /* low-FX mode (iOS / small screens / reduced-motion): drop the GPU-heavy effects */
+  body.lowfx .bg-nebula{display:none}
+  body.lowfx header.bar,body.lowfx .toolbar{backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.lowfx header.bar{background:rgba(10,10,12,.96)}
+  body.lowfx .toolbar{background:rgba(12,12,15,.96)}
+  body.lowfx .overlay,body.lowfx #bootFx,body.lowfx #loaderOverlay,body.lowfx #loaderOverlayS,body.lowfx #cardLoading{backdrop-filter:none;-webkit-backdrop-filter:none}
+  body.lowfx .bg-glow{filter:blur(0px)}
 </style>
 </head>
 <body>
@@ -466,7 +478,7 @@
           <div class="lo-bar"><div class="lo-fill" id="loaderFill"></div></div>
           <div class="lo-label">SCANNING ASSET</div>
         </div>
-        <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <model-viewer id="stageViewer" camera-controls touch-action="pan-y" disable-pan autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
           <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
@@ -581,7 +593,7 @@
       <div class="lo-bar"><div class="lo-fill" id="loaderFillS"></div></div>
       <div class="lo-label">SCANNING ASSET</div>
     </div>
-    <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+    <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" disable-pan auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
       <p>AR-only model</p>
@@ -598,13 +610,21 @@
   </div>
 </div>
 
+<!-- hidden viewer used to capture a crisp asset render for the share card -->
+<model-viewer id="captureMV" interaction-prompt="none" shadow-intensity="1.2" exposure="1.05" disable-zoom disable-pan disable-tap style="position:fixed;left:0;top:0;width:512px;height:512px;opacity:0;pointer-events:none;z-index:-1"></model-viewer>
+<!-- hidden viewer used to render repository thumbnails one-at-a-time (keeps WebGL contexts low) -->
+<model-viewer id="posterMV" interaction-prompt="none" shadow-intensity="0.9" exposure="1.05" disable-zoom disable-pan disable-tap style="position:fixed;left:0;top:0;width:220px;height:220px;opacity:0;pointer-events:none;z-index:-1"></model-viewer>
+
 <!-- Share modal -->
 <div class="overlay" id="shareModal">
   <div class="modal">
     <div class="mhead"><h3>Share &amp; launch AR</h3><button class="closeX" onclick="closeShare()">✕</button></div>
     <div class="mbody">
-      <p style="color:var(--text-2);font-size:14px">Scan to open <b id="shareName" style="color:var(--text)">this model</b> in AR — Android uses the GLB, iPhone uses the USDZ automatically.</p>
-      <div class="qr-card-wrap"><canvas id="qrCanvas" width="720" height="880" aria-label="Shareable QR code"></canvas></div>
+      <p style="color:var(--text-2);font-size:13.5px">Save the collectible card or share the link. Scan to open <b id="shareName" style="color:var(--text)">this model</b> in AR — Android uses the GLB, iPhone the USDZ.</p>
+      <div class="qr-card-wrap">
+        <canvas id="qrCanvas" width="860" height="1204" aria-label="Shareable AR card"></canvas>
+        <div id="cardLoading"><div class="card-spin"></div><span>BUILDING CARD…</span></div>
+      </div>
       <div id="qrRaw" style="visibility:hidden;position:fixed;left:-9999px;top:-9999px;width:320px;height:320px;overflow:hidden"></div>
       <div>
         <span class="eyebrow">Public link</span>
@@ -613,7 +633,7 @@
       <div class="share-actions">
         <button class="btn btn-primary btn-block" onclick="saveQR()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Save QR to Photos
+          Save card to Photos
         </button>
       </div>
     </div>
@@ -724,7 +744,7 @@ async function loadAssets(){
       let src=r.url||null, iosSrc=r.ios_src||null, path=r.path||null, iosPath=r.ios_path||null;
       // legacy safety: an old asset whose only file was a USDZ -> treat as AR-only
       if(!iosSrc && isUsdz(src)){ iosSrc=src; iosPath=path; src=null; path=null; }
-      return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath};
+      return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath,poster:r.poster||null};
     });
   }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
   renderRepo();
@@ -746,74 +766,70 @@ function renderRepo(){
   document.getElementById('repoCount').textContent=assets.length+(assets.length===1?' asset':' assets');
   document.getElementById('mTotal').textContent=assets.length;
   if(!assets.length){ list.innerHTML='<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to save it to the cloud.</p></div>'; return; }
-  list.innerHTML=assets.map(a=>`
+  const cube='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>';
+  list.innerHTML=assets.map(a=>{
+    const poster = a.poster || posterCache[a.id];
+    const inner = (a.src && poster) ? `<img class="thumb-img" src="${poster}" alt="" loading="lazy" decoding="async">` : cube;
+    return `
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
-      <div class="thumb" id="thwrap-${a.id}">${a.src
-        ? `<model-viewer id="th-${a.id}" src="${a.src}" disable-zoom interaction-prompt="none" camera-orbit="35deg 75deg auto" loading="lazy" exposure="1"></model-viewer>
-           <span class="anim-dot"></span>
-           <button class="thumb-play" title="Play / pause animation" onclick="toggleThumb(event,'${a.id}')">
-             <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
-             <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
-           </button>`
-        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>`}</div>
+      <div class="thumb" id="thwrap-${a.id}" data-id="${a.id}" data-src="${a.src||''}">${inner}</div>
       <div class="meta">
         <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</span>${a.iosSrc?'<span class="badge-ios">iOS AR</span>':''}</div>
         <div class="sub">${a.src?a.fmt:'USDZ'} · ${a.size}</div>
-        ${a.src?`<div class="anim-ctrls" id="ctrls-${a.id}">
-          <button class="ac-btn" id="acplay-${a.id}" title="Play / pause" onclick="event.stopPropagation();thumbPlay('${a.id}')"><svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></button>
-          <button class="ac-btn active" id="acloop-${a.id}" title="Loop on / off" onclick="thumbLoop(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
-          <button class="ac-btn" title="Restart timeline" onclick="thumbReset(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.5 8a9 9 0 1 0 2-3.3L3 8"/></svg></button>
-        </div>`:''}
       </div>
       <div class="acts">
         <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
         <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
       </div>
-    </div>`).join('');
-  // detect which thumbnails are animated -> reveal play / loop / reset controls
-  assets.forEach(a=>{
-    if(!a.src) return;
-    const mv=document.getElementById('th-'+a.id);
-    if(!mv) return;
-    mv.addEventListener('load',()=>{
-      try{
-        if(mv.availableAnimations && mv.availableAnimations.length){
-          document.getElementById('thwrap-'+a.id)?.classList.add('anim');
-          document.getElementById('ctrls-'+a.id)?.classList.add('show');
-          mv.dataset.loop='1';
-          mv.pause();
-        }
-      }catch(e){}
-    },{once:true});
-    mv.addEventListener('finished',()=>syncThumb(a.id,false)); // loop-off animation reached its end
+    </div>`;
+  }).join('');
+  observePosters();
+}
+
+/* ---- lightweight repo thumbnails: render a poster once, one viewer at a time ---- */
+const posterCache={};
+let posterBusy=false; const posterQ=[]; let posterIO=null;
+function observePosters(){
+  const need=a=>a.src && !(a.poster||posterCache[a.id]);
+  if(!('IntersectionObserver' in window)){ assets.forEach(a=>{ if(need(a)) queuePoster(a.id,a.src); }); return; }
+  if(posterIO) posterIO.disconnect();
+  posterIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ posterIO.unobserve(en.target); queuePoster(en.target.dataset.id, en.target.dataset.src); } }); },{root:document.getElementById('repoList'),rootMargin:'150px'});
+  document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
+}
+function queuePoster(id,src){ if(!src||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
+async function drainPosters(){
+  if(posterBusy) return; const job=posterQ.shift(); if(!job) return; posterBusy=true;
+  const url=await captureThumb(job.src);
+  if(url){
+    posterCache[job.id]=url;
+    const w=document.getElementById('thwrap-'+job.id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
+    persistPoster(job.id, url);   // upload once so it never needs re-rendering
+  }
+  posterBusy=false; setTimeout(drainPosters,80);
+}
+// upload a captured poster to Supabase + save its URL (best-effort, never blocks UI)
+async function persistPoster(id, dataUrl){
+  try{
+    if(!sb || !user) return;
+    const a=assets.find(x=>x.id===id); if(!a || a.poster) return;
+    const blob=await (await fetch(dataUrl)).blob();
+    const path=`${user.id}/poster-${id}.webp`;
+    const up=await sb.storage.from(BUCKET).upload(path, blob, {contentType:'image/webp', upsert:true});
+    if(up.error) return;
+    const purl=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const r=await sb.from('assets').update({poster:purl}).eq('id',id);
+    if(!r.error){ a.poster=purl; }   // column exists -> cached permanently
+  }catch(e){ /* poster column may not exist yet; lazy capture still works */ }
+}
+function captureThumb(src){
+  return new Promise(resolve=>{
+    const mv=document.getElementById('posterMV'); if(!mv||!src){resolve(null);return;}
+    let done=false; const fin=v=>{ if(done)return; done=true; mv.removeEventListener('load',onLoad); try{mv.removeAttribute('src')}catch(e){}; resolve(v); };
+    const onLoad=async()=>{ await new Promise(r=>setTimeout(r,220)); try{ const u=mv.toDataURL('image/webp',0.82); fin(u&&u.length>200?u:null); }catch(e){ fin(null); } };
+    mv.addEventListener('load',onLoad);
+    mv.setAttribute('camera-orbit','-18deg 76deg auto'); mv.setAttribute('src',src);
+    setTimeout(()=>fin(null),9000);
   });
-}
-function thumbMV(id){ return document.getElementById('th-'+id); }
-function thumbAnimated(mv){ return mv && mv.availableAnimations && mv.availableAnimations.length>0; }
-function syncThumb(id,playing){
-  document.getElementById('thwrap-'+id)?.classList.toggle('playing',playing);
-  document.getElementById('acplay-'+id)?.classList.toggle('playing',playing);
-}
-function thumbToggle(id){
-  const mv=thumbMV(id); if(!mv) return;
-  if(!thumbAnimated(mv)){ loadAsset(id); return; }            // not animated -> just open it
-  if(mv.paused){ mv.play({repetitions: mv.dataset.loop==='0'?1:Infinity}); syncThumb(id,true); }
-  else { mv.pause(); syncThumb(id,false); }
-}
-function toggleThumb(e,id){ e.stopPropagation(); thumbToggle(id); }   // tap on the thumbnail itself
-function thumbPlay(id){ thumbToggle(id); }                            // play/pause control button
-function thumbLoop(e,id){
-  e.stopPropagation();
-  const mv=thumbMV(id); if(!mv) return;
-  const on = mv.dataset.loop!=='0';        // currently looping?
-  mv.dataset.loop = on?'0':'1';            // toggle loop
-  document.getElementById('acloop-'+id)?.classList.toggle('active', !on);
-  if(!mv.paused) mv.play({repetitions: on?1:Infinity}); // re-apply to the running animation
-}
-function thumbReset(e,id){
-  e.stopPropagation();
-  const mv=thumbMV(id); if(!mv) return;
-  try{ mv.currentTime=0; }catch(_){}       // rewind timeline to the start
 }
 function loadAsset(id){
   const a=assets.find(x=>x.id===id); if(!a) return;
@@ -945,8 +961,14 @@ async function deploy(){
     const ins=await sb.from('assets').insert({user_id:user.id,name,format:fmt,size,path:glbPath,url,ios_src:iosSrc,ios_path:iosPath}).select().single();
     if(ins.error) throw ins.error;
     const r=ins.data;
-    assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path});
-    renderRepo(); loadAsset(r.id); resetUpload();
+    assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null});
+    renderRepo(); loadAsset(r.id);
+    // render a thumbnail poster from the local file (no re-download) and store it permanently
+    try{
+      const durl=await captureThumb(previewGlbUrl||url);
+      if(durl){ posterCache[r.id]=durl; renderRepo(); persistPoster(r.id,durl); }
+    }catch(e){}
+    resetUpload();
     toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
@@ -1000,7 +1022,13 @@ function toggleRotate(){
   const v=document.getElementById('stageViewer'),b=document.getElementById('rotBtn');
   if(rotating){v.setAttribute('auto-rotate','');b.classList.add('active')}else{v.removeAttribute('auto-rotate');b.classList.remove('active')}
 }
-function resetCam(){const v=document.getElementById('stageViewer');v.cameraOrbit='0deg 75deg auto';v.fieldOfView='auto';toast('Camera reset')}
+function resetCam(){
+  const v=document.getElementById('stageViewer');
+  v.cameraOrbit='0deg 75deg auto';
+  v.fieldOfView='auto';
+  v.cameraTarget='auto auto auto';   // snap orbit pivot back to bounding-box center
+  toast('Camera reset');
+}
 function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
 function launchAR(){
   const v=document.getElementById('stageViewer');
@@ -1009,7 +1037,7 @@ function launchAR(){
 }
 
 /* ===================== SHARE ===================== */
-function openShare(id){
+async function openShare(id){
   const a=assets.find(x=>x.id===(id||activeId)); if(!a){ toast('Load an asset first'); return; }
   const params=new URLSearchParams(); params.set('name',a.name);
   if(a.src) params.set('model',a.src);
@@ -1018,81 +1046,150 @@ function openShare(id){
   qrName=a.name;
   document.getElementById('shareLink').value=qrLink;
   document.getElementById('shareName').textContent=a.name;
-  drawQRCard(qrLink, a.name);
   document.getElementById('shareModal').classList.add('show');
+  document.getElementById('cardLoading').classList.add('show');
+  try{ await buildShareCard(a); }catch(e){ /* fallback already drawn */ }
+  document.getElementById('cardLoading').classList.remove('show');
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
 
-async function fontsReady(){ try{ await Promise.all([document.fonts.load('800 30px Syne'),document.fonts.load('700 15px "Space Mono"')]); }catch(e){} }
+async function fontsReady(){ try{ await Promise.all([document.fonts.load('800 40px Syne'),document.fonts.load('700 16px "Space Mono"'),document.fonts.load('400 14px "Space Mono"')]); }catch(e){} }
 
 // draw the brand cube glyph (24-grid) centred at cx,cy with grid-unit scale s
-function cubeGlyph(ctx, cx, cy, s, lw){
+function cubeGlyph(ctx, cx, cy, s, lw, color){
+  const col=color||'#cdf24a';
   const pts={A:[12,2],B:[21,7],C:[21,17],D:[12,22],E:[3,17],F:[3,7],G:[12,12]};
   const P=k=>[cx+(pts[k][0]-12)*s, cy+(pts[k][1]-12)*s];
   ctx.lineJoin='round'; ctx.lineCap='round';
-  ctx.beginPath(); ['F','A','B','G'].forEach((k,i)=>{const[x,y]=P(k); i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.closePath();
-  ctx.fillStyle='rgba(205,242,74,.22)'; ctx.fill();
   ctx.beginPath(); ['A','B','C','D','E','F'].forEach((k,i)=>{const[x,y]=P(k); i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.closePath();
   const seg=(a,b)=>{const[x1,y1]=P(a),[x2,y2]=P(b); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2)};
   seg('G','F'); seg('G','B'); seg('G','D');
-  ctx.strokeStyle='#cdf24a'; ctx.lineWidth=lw; ctx.stroke();
+  ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.stroke();
 }
 function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
-async function drawQRCard(link, name){
-  const raw=document.getElementById('qrRaw'); raw.innerHTML='';
-  const QS=300; // 300px is crisp enough; 496 caused iOS canvas drawImage issues
-  if(window.QRCode){ new QRCode(raw,{text:link,width:QS,height:QS,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }
-  // wait one tick for qrcodejs to finish rendering into the DOM
-  await new Promise(r=>setTimeout(r,80));
-  const node = raw.querySelector('canvas') || raw.querySelector('img');
-  await fontsReady();
-  const render=()=>composeCard(node,name);
-  if(node && node.tagName==='IMG' && !node.complete){ node.onload=render; } else { render(); }
+// capture a crisp PNG render of the asset using a hidden model-viewer
+function captureAsset(src){
+  return new Promise(resolve=>{
+    const mv=document.getElementById('captureMV'); if(!mv||!src){ resolve(null); return; }
+    let done=false;
+    const finish=(img)=>{ if(done) return; done=true; mv.removeEventListener('load',onLoad); resolve(img); };
+    const onLoad=async()=>{
+      await new Promise(r=>setTimeout(r,350)); // let it render a frame
+      try{
+        const blob=await mv.toBlob({mimeType:'image/png',idealAspect:false});
+        const img=new Image();
+        img.onload=()=>finish(img); img.onerror=()=>finish(null);
+        img.src=URL.createObjectURL(blob);
+      }catch(e){ finish(null); }
+    };
+    mv.addEventListener('load',onLoad);
+    mv.setAttribute('camera-orbit','-20deg 78deg auto');
+    mv.setAttribute('src',src);
+    setTimeout(()=>finish(null), 7000);
+  });
 }
-function composeCard(qrNode, name){
+// generate a QR node (canvas/img) for the link
+async function makeQRNode(link){
+  const raw=document.getElementById('qrRaw'); raw.innerHTML='';
+  if(window.QRCode){ new QRCode(raw,{text:link,width:380,height:380,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }
+  await new Promise(r=>setTimeout(r,80));
+  return raw.querySelector('canvas') || raw.querySelector('img');
+}
+async function buildShareCard(a){
+  const [assetImg, qrNode] = await Promise.all([ captureAsset(a.src), makeQRNode(qrLink) ]);
+  await fontsReady();
+  composeTradingCard({assetImg, qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ')});
+}
+
+function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   const c=document.getElementById('qrCanvas'); const ctx=c.getContext('2d');
-  const DPR=2, W=360, H=440;
+  const DPR=2, W=430, H=602;
   c.width=W*DPR; c.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.clearRect(0,0,W,H);
 
-  // background card
-  roundRect(ctx,0,0,W,H,28); ctx.save(); ctx.clip();
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#17171d'); g.addColorStop(1,'#0a0a0c');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  const glow=ctx.createRadialGradient(W/2,70,10,W/2,70,260); glow.addColorStop(0,'rgba(205,242,74,.16)'); glow.addColorStop(1,'rgba(205,242,74,0)');
-  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+  // ---- outer glowing gradient border ----
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#43e6f0'); bg.addColorStop(.4,'#5b7cff'); bg.addColorStop(.7,'#b15cff'); bg.addColorStop(1,'#43e6f0');
+  roundRect(ctx,4,4,W-8,H-8,30); ctx.fillStyle=bg; ctx.fill();
+
+  // ---- inner card ----
+  const ix=14, iy=14, iw=W-28, ih=H-28;
+  roundRect(ctx,ix,iy,iw,ih,22); ctx.save(); ctx.clip();
+  const dark=ctx.createLinearGradient(0,iy,0,iy+ih); dark.addColorStop(0,'#191c24'); dark.addColorStop(.5,'#101218'); dark.addColorStop(1,'#0a0b10');
+  ctx.fillStyle=dark; ctx.fillRect(ix,iy,iw,ih);
+
+  // subtle circuit traces
+  ctx.strokeStyle='rgba(80,200,230,.16)'; ctx.lineWidth=1.2; ctx.lineCap='round';
+  const trace=(pts)=>{ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke();
+    const e=pts[pts.length-1]; ctx.beginPath(); ctx.arc(e[0],e[1],2.4,0,7); ctx.fillStyle='rgba(80,200,230,.5)'; ctx.fill(); };
+  trace([[ix,120],[90,120],[120,150],[120,250]]);
+  trace([[ix+iw,180],[W-110,180],[W-150,220],[W-150,300]]);
+  trace([[ix,430],[70,430],[100,460],[230,460]]);
+  trace([[ix+iw,500],[W-60,500],[W-90,470],[W-150,470]]);
+  trace([[ix,330],[60,330],[80,350]]);
+
+  // top radial sheen
+  const sheen=ctx.createRadialGradient(W/2,70,10,W/2,70,300); sheen.addColorStop(0,'rgba(120,170,255,.10)'); sheen.addColorStop(1,'rgba(120,170,255,0)');
+  ctx.fillStyle=sheen; ctx.fillRect(ix,iy,iw,ih);
+
+  // ---- header ----
+  // logo chip
+  roundRect(ctx,30,34,62,62,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1.4; ctx.stroke();
+  cubeGlyph(ctx,61,65,1.7,2.4,'#ffffff');
+  // brand text
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#ffffff';
+  ctx.font='800 33px "Syne", sans-serif'; ctx.fillText('CREARTOR', 108, 62);
+  ctx.fillStyle='rgba(255,255,255,.62)'; ctx.font='400 12px "Space Mono", monospace';
+  ctx.fillText('WEBAR VIEWER BY', 110, 80);
+  ctx.fillText('WOLFPUPLABS', 110, 95);
+
+  // ---- asset render (center) ----
+  const stageY=120, stageH=300;
+  // platform glow
+  const pg=ctx.createRadialGradient(W/2,stageY+stageH-30,8,W/2,stageY+stageH-30,180);
+  pg.addColorStop(0,'rgba(120,170,255,.22)'); pg.addColorStop(1,'rgba(120,170,255,0)');
+  ctx.fillStyle=pg; ctx.fillRect(ix,stageY,iw,stageH+40);
+  if(assetImg){
+    // contain the render within the stage area
+    const maxW=iw-60, maxH=stageH; const ar=assetImg.width/assetImg.height;
+    let dw=maxW, dh=dw/ar; if(dh>maxH){ dh=maxH; dw=dh*ar; }
+    ctx.drawImage(assetImg, W/2-dw/2, stageY+(stageH-dh)/2, dw, dh);
+  } else {
+    cubeGlyph(ctx, W/2, stageY+stageH/2, 5, 3, 'rgba(255,255,255,.5)');
+  }
+
+  // ---- bottom-left info panel ----
+  const px=30, py=H-150, pw=210, ph=86;
+  roundRect(ctx,px,py,pw,ph,14); ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.font='700 12px "Space Mono", monospace'; ctx.fillStyle='rgba(255,255,255,.5)'; ctx.textAlign='left';
+  ctx.fillText('MODEL', px+16, py+30);
+  ctx.fillText('SIZE',  px+16, py+62);
+  ctx.fillStyle='#ffffff'; ctx.font='700 14px "Space Mono", monospace';
+  let nm=(name||'model').toUpperCase(); if(nm.length>16) nm=nm.slice(0,15)+'…';
+  ctx.fillText(nm, px+74, py+30);
+  ctx.fillText((size||'—').toUpperCase(), px+74, py+62);
+
+  // ---- QR (bottom-right) ----
+  const qs=124, qx=W-30-qs, qy=H-30-qs-18;
+  ctx.textAlign='center'; ctx.fillStyle='#ffffff'; ctx.font='700 12px "Space Mono", monospace';
+  ctx.fillText('SCAN TO VIEW', qx+qs/2, qy-26);
+  ctx.fillText('AR SCENE', qx+qs/2, qy-11);
+  // neon frame
+  const qf=ctx.createLinearGradient(qx,qy,qx+qs,qy+qs); qf.addColorStop(0,'#43e6f0'); qf.addColorStop(1,'#b15cff');
+  roundRect(ctx,qx-16,qy-16,qs+32,qs+32,16); ctx.fillStyle=qf; ctx.fill();
+  // white plate with generous quiet zone (>=4 modules) so it scans when printed
+  ctx.fillStyle='#ffffff'; roundRect(ctx,qx-11,qy-11,qs+22,qs+22,11); ctx.fill();
+  if(qrNode){ try{ ctx.drawImage(qrNode,qx,qy,qs,qs); }catch(e){} }
+  // small logo chip in QR centre (kept small; QR uses high error-correction)
+  const lc=qs*0.18, lx=qx+qs/2, ly=qy+qs/2;
+  ctx.fillStyle='#ffffff'; roundRect(ctx,lx-lc/2,ly-lc/2,lc,lc,6); ctx.fill();
+  cubeGlyph(ctx, lx, ly, (lc*0.66)/20, 2, '#0a0a0c');
+
   ctx.restore();
-  roundRect(ctx,1.5,1.5,W-3,H-3,27); ctx.strokeStyle='rgba(205,242,74,.18)'; ctx.lineWidth=1.5; ctx.stroke();
-
-  // brand row
-  cubeGlyph(ctx, 40, 40, 1.15, 2.2);
-  ctx.fillStyle='#cdf24a'; ctx.textBaseline='middle'; ctx.textAlign='left';
-  ctx.font='700 14px "Space Mono", monospace';
-  ctx.fillText('CREARTOR·AR', 58, 41);
-
-  // white QR plate
-  const qx=56, qy=72, qs=248;
-  ctx.fillStyle='#ffffff'; roundRect(ctx,qx-8,qy-8,qs+16,qs+16,18); ctx.fill();
-  if(qrNode){ try{ ctx.drawImage(qrNode, qx, qy, qs, qs); }catch(e){} }
-  else { ctx.fillStyle='#0a0a0c'; ctx.font='12px "Space Mono"'; ctx.textAlign='center'; ctx.fillText('QR unavailable', W/2, qy+qs/2); }
-
-  // centre logo chip on the QR (QR uses high error-correction, so this is safe)
-  const lc=qs*0.2, lx=W/2, ly=qy+qs/2;
-  ctx.fillStyle='#ffffff'; roundRect(ctx,lx-lc/2,ly-lc/2,lc,lc,12); ctx.fill();
-  ctx.strokeStyle='rgba(10,10,12,.08)'; ctx.lineWidth=1; ctx.stroke();
-  cubeGlyph(ctx, lx, ly, (lc*0.72)/20, 2.4);
-
-  // model name
-  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#f3f3ef'; ctx.font='800 22px "Syne", sans-serif';
-  let t=name||'3D model'; if(t.length>22) t=t.slice(0,21)+'…';
-  ctx.fillText(t, W/2, qy+qs+44);
-
-  // caption
-  ctx.fillStyle='#8a8a92'; ctx.font='700 11px "Space Mono", monospace';
-  ctx.fillText('SCAN TO VIEW IN AR', W/2, qy+qs+68);
 }
 
 async function saveQR(){
@@ -1146,6 +1243,8 @@ function goWorkspace(){ location.href=location.origin+location.pathname; }
 /* ===================== UTILS ===================== */
 /* ===================== FX HELPERS ===================== */
 const REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const LOW_FX = REDUCE_MOTION || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || !!(window.matchMedia && window.matchMedia('(max-width:820px)').matches);
+if(LOW_FX) document.body.classList.add('lowfx');
 
 /* ---- optional sound FX (synthesised, no audio files) ---- */
 function loadPref(k,def){ try{ const v=localStorage.getItem('creartor_'+k); return v===null?def:v==='1'; }catch(e){ return def; } }
@@ -1264,6 +1363,19 @@ function updateMusicBtn(){
   b.querySelector('.i-off').style.display = musicOn?'none':'block';
 }
 
+// pause all audio + the recurring scan timer while the tab is in the background
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    clearInterval(scanTimer); scanTimer=null;
+    try{ if(actx && actx.state==='running') actx.suspend(); }catch(e){}
+  }else{
+    try{ if(actx && actx.state==='suspended' && (musicOn||soundOn)) actx.resume(); }catch(e){}
+    if(musicOn && ambient && !scanTimer){
+      scanTimer=setInterval(()=>{ if(musicOn) sfxScan(0.13); }, 6000);
+    }
+  }
+});
+
 /* ---- anime speed-lines burst (inside the given viewport box) ---- */
 function speedLines(scope){
   if(REDUCE_MOTION) return;
@@ -1305,7 +1417,8 @@ function makeStageDots(){
   if(REDUCE_MOTION) return;
   document.querySelectorAll('.stage-depth').forEach(box=>{
     if(box.dataset.dots) return; box.dataset.dots='1';
-    for(let i=0;i<10;i++){
+    const N=LOW_FX?5:10;
+    for(let i=0;i<N;i++){
       const d=document.createElement('span'); d.className='sdot';
       const sz=(1.4+Math.random()*1.8).toFixed(1)+'px';
       d.style.width=d.style.height=sz;
@@ -1328,7 +1441,7 @@ function hideLoaderS(){ const el=document.getElementById('loaderOverlayS'); if(e
 function makeParticles(){
   if(REDUCE_MOTION) return;
   const box=document.getElementById('fxParticles'); if(!box || box.childElementCount) return;
-  const N=38;
+  const N=LOW_FX?16:38;
   for(let i=0;i<N;i++){
     const s=document.createElement('i');
     const depth=Math.random();                       // 0 = far, 1 = near
