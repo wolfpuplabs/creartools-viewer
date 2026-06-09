@@ -1123,19 +1123,21 @@ async function makeQRNode(link){
   await new Promise(r=>setTimeout(r,80));
   return raw.querySelector('canvas') || raw.querySelector('img');
 }
+function withTimeout(p, ms){ return Promise.race([ Promise.resolve(p), new Promise(r=>setTimeout(()=>r(null), ms)) ]); }
 async function buildShareCard(a){
   const qrNode = await makeQRNode(qrLink);
-  let assetImg=null;
-  // 1) live stage view when the shared asset is on screen AND finished loading (instant, matches what you see)
-  if(a.id===activeId){ assetImg = await captureStage(); }
-  // 2) instant in-memory poster captured earlier (e.g. right after upload)
-  if(!assetImg && posterCache[a.id]){ assetImg = await urlToImg(posterCache[a.id]); }
-  // 3) the saved poster URL
-  if(!assetImg && a.poster){ assetImg = await urlToImg(a.poster); }
-  // 4) last resort: render in the hidden viewer (slower; may re-download)
-  if(!assetImg && a.src){ assetImg = await captureAsset(a.src); }
+  const meta={ qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
   await fontsReady();
-  composeTradingCard({assetImg, qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ')});
+  // 1) draw the card right away with the QR + placeholder so it's never blank / stuck
+  composeTradingCard({assetImg:null, ...meta});
+  document.getElementById('cardLoading')?.classList.remove('show');
+  // 2) fetch the best available render (each step capped so it can't hang), then redraw
+  let img=null;
+  if(a.id===activeId)            img = await withTimeout(captureStage(), 2500);
+  if(!img && posterCache[a.id])  img = await withTimeout(urlToImg(posterCache[a.id]), 2500);
+  if(!img && a.poster)           img = await withTimeout(urlToImg(a.poster), 3000);
+  if(!img && a.src)              img = await withTimeout(captureAsset(a.src), 5000);
+  if(img) composeTradingCard({assetImg:img, ...meta});
 }
 
 function composeTradingCard({assetImg, qrNode, name, size, fmt}){
