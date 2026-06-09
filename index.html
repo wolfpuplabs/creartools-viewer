@@ -241,11 +241,80 @@
   @media(max-width:520px){.bar .pill{display:none}.logout-text{display:none}.btn-ghost{padding:9px 11px}.auth-main,.auth-aside{padding:26px}#sharedView header{padding:14px 16px}#sharedView .sv-banner .nm{font-size:17px}}
   @media(max-width:480px){.toolbar{flex-wrap:wrap;justify-content:center}.modal .mbody{padding:20px}.stage-meta .m b{font-size:12px}}
   @media(max-width:380px){.logo .word{font-size:11px}.tool{width:38px;height:38px}.tool.ar{padding:0 12px}}
+  /* ===================== SCI-FI / ANIME FX ===================== */
+  @keyframes glowDrift{0%{transform:translateX(-50%) translateY(0) scale(1)}50%{transform:translateX(-46%) translateY(18px) scale(1.08)}100%{transform:translateX(-50%) translateY(0) scale(1)}}
+  .bg-glow{animation:glowDrift 14s ease-in-out infinite}
+  @keyframes gridPan{from{background-position:0 0}to{background-position:0 34px}}
+  .bg-grid{animation:gridPan 9s linear infinite}
+
+  .bg-scan{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;
+    background:linear-gradient(to bottom, transparent 0, rgba(205,242,74,.05) 48%, rgba(205,242,74,.10) 50%, rgba(205,242,74,.05) 52%, transparent 100%);
+    height:180px;animation:bgScan 7.5s linear infinite}
+  @keyframes bgScan{0%{transform:translateY(-200px)}100%{transform:translateY(100vh)}}
+
+  .fx-particles{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+  .fx-particles i{position:absolute;bottom:-10px;width:3px;height:3px;border-radius:50%;background:var(--signal);opacity:.0;box-shadow:0 0 8px var(--signal);animation:floatUp linear infinite}
+  @keyframes floatUp{0%{transform:translateY(0) scale(.6);opacity:0}10%{opacity:.7}90%{opacity:.5}100%{transform:translateY(-105vh) scale(1);opacity:0}}
+
+  /* neon flicker on the wordmark */
+  .logo .word b{text-shadow:0 0 10px rgba(205,242,74,.55)}
+  @keyframes flicker{0%,18%,22%,25%,53%,57%,100%{opacity:1}20%,23%,55%{opacity:.55}}
+  .logo .word{animation:flicker 8s steps(1,end) infinite}
+
+  /* holographic sheen sweep on primary buttons */
+  .btn{position:relative;overflow:hidden}
+  .btn-primary::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;transform:skewX(-20deg);background:linear-gradient(110deg,transparent,rgba(255,255,255,.55),transparent);opacity:0}
+  .btn-primary:hover::after{animation:sheen .85s var(--ease)}
+  @keyframes sheen{0%{left:-70%;opacity:.9}100%{left:170%;opacity:.9}}
+
+  /* rotating energy border + scan sweep on the stage */
+  .stage::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1.4px;z-index:4;pointer-events:none;
+    background:conic-gradient(from 0deg, transparent 0 62%, rgba(205,242,74,.08) 74%, var(--signal) 84%, rgba(205,242,74,.08) 90%, transparent 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;
+    animation:ringSpin 6s linear infinite;opacity:.85}
+  @keyframes ringSpin{to{transform:rotate(360deg)}}
+  .scan-sweep{position:absolute;left:0;right:0;top:0;height:34%;z-index:2;pointer-events:none;
+    background:linear-gradient(to bottom, transparent, rgba(205,242,74,.05) 55%, rgba(205,242,74,.16));
+    border-bottom:1px solid rgba(205,242,74,.5);box-shadow:0 0 18px rgba(205,242,74,.25);
+    transform:translateY(-120%);animation:scanSweep 6s var(--ease) infinite}
+  @keyframes scanSweep{0%{transform:translateY(-120%)}55%{transform:translateY(320%)}100%{transform:translateY(320%)}}
+
+  /* lock-on corner brackets */
+  @keyframes lockIn{0%{opacity:0;transform:translate(var(--lx,-6px),var(--ly,-6px))}100%{opacity:1;transform:translate(0,0)}}
+  .stage .crop{animation:lockIn .6s var(--ease) both, cropPulse 4s ease-in-out infinite 1s}
+  @keyframes cropPulse{0%,100%{box-shadow:0 0 0 rgba(205,242,74,0)}50%{box-shadow:0 0 10px rgba(205,242,74,.35)}}
+  .stage .crop.tl{--lx:-6px;--ly:-6px}.stage .crop.tr{--lx:6px;--ly:-6px}.stage .crop.bl{--lx:-6px;--ly:6px}.stage .crop.br{--lx:6px;--ly:6px}
+
+  /* thumbnail targeting glow */
+  .asset:hover .thumb,.asset.active .thumb{box-shadow:0 0 0 1px rgba(205,242,74,.5),0 0 16px -2px rgba(205,242,74,.4)}
+
+  /* decode caret while text is scrambling */
+  .decoding::after{content:"▍";color:var(--signal);margin-left:1px;animation:caret .5s steps(1) infinite}
+  @keyframes caret{50%{opacity:0}}
+
+  /* boot-up overlay */
+  #bootFx{position:fixed;inset:0;z-index:70;display:none;place-items:center;pointer-events:none;background:rgba(8,8,11,.55);backdrop-filter:blur(2px)}
+  #bootFx.run{display:grid;animation:bootFade 1.15s var(--ease) forwards}
+  #bootFx .boot-txt{font-family:"Space Mono",monospace;letter-spacing:.4em;font-size:13px;color:var(--signal);text-transform:uppercase;text-shadow:0 0 14px rgba(205,242,74,.6);transform:translateY(0)}
+  #bootFx .boot-line{position:absolute;left:0;right:0;height:2px;background:var(--signal);box-shadow:0 0 20px 2px var(--signal);top:50%;animation:bootScan 1.15s var(--ease) forwards}
+  @keyframes bootFade{0%{opacity:0}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
+  @keyframes bootScan{0%{transform:scaleX(0);opacity:0}25%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1) translateY(-46vh);opacity:0}}
+
+  /* power-on entrance for panels */
+  @keyframes powerOn{0%{opacity:0;transform:translateY(18px)}60%{opacity:1}100%{opacity:1;transform:none}}
+
+  @media (prefers-reduced-motion: reduce){
+    .bg-glow,.bg-grid,.bg-scan,.fx-particles,.logo .word,.stage::before,.scan-sweep,.stage .crop{animation:none!important}
+    .bg-scan,.scan-sweep{display:none}
+    #bootFx.run{animation-duration:.4s}
+  }
 </style>
 </head>
 <body>
 
 <div class="bg-glow"></div>
+<div class="bg-scan"></div>
+<div class="fx-particles" id="fxParticles"></div>
 <div class="bg-grid"></div>
 <div class="bg-noise"></div>
 
@@ -302,6 +371,7 @@
     <section class="stagewrap">
       <div class="stage">
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
           <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
           <p>AR-only asset (USDZ)</p>
@@ -438,6 +508,7 @@
   </div>
 </div>
 
+<div id="bootFx"><div class="boot-line"></div><div class="boot-txt" id="bootTxt">SYSTEM ONLINE</div></div>
 <div id="toast"><span class="dot"></span><span id="toastMsg">Done</span></div>
 
 <script>
@@ -526,6 +597,7 @@ function enterApp(){
   document.getElementById('avatar').textContent=((em[0]||'A')+(em[1]||'R')).toUpperCase();
   document.getElementById('authGate').style.display='none';
   document.getElementById('app').style.display='flex';
+  bootFx();
   loadAssets();
 }
 
@@ -548,7 +620,7 @@ function showSample(){
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
   v.style.display=''; empty.style.display='none';
   v.removeAttribute('ios-src'); v.setAttribute('src',SAMPLE); v.setAttribute('auto-rotate','');
-  document.getElementById('nowName').textContent='Sample preview';
+  setStageName('Sample preview');
   document.getElementById('nowFmt').textContent='DEMO';
   document.getElementById('nowDim').textContent='upload to begin';
   document.getElementById('mFormat').textContent='—';
@@ -645,7 +717,7 @@ function loadAsset(id){
   }
   if(a.iosSrc) v.setAttribute('ios-src',a.iosSrc); else v.removeAttribute('ios-src');
   const fmtLabel = a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ';
-  document.getElementById('nowName').textContent=a.name;
+  setStageName(a.name);
   document.getElementById('nowFmt').textContent=fmtLabel;
   document.getElementById('mFormat').textContent=fmtLabel;
   document.getElementById('mSize').textContent=a.size;
@@ -719,7 +791,7 @@ function showPreview(){
   if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
   v.setAttribute('src',previewGlbUrl);
   activeId=null; renderRepo();
-  document.getElementById('nowName').textContent=nm;
+  setStageName(nm);
   document.getElementById('nowFmt').textContent='PREVIEW';
   document.getElementById('nowDim').textContent='not saved yet';
   document.getElementById('mFormat').textContent=fmt;
@@ -934,6 +1006,53 @@ function showShared(url,name,iosUrl){
 function goWorkspace(){ location.href=location.origin+location.pathname; }
 
 /* ===================== UTILS ===================== */
+/* ===================== FX HELPERS ===================== */
+const REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function setStageName(text){
+  const el=document.getElementById('nowName');
+  if(REDUCE_MOTION){ el.textContent=text; return; }
+  decodeText(el, text, 460);
+}
+function decodeText(el, text, dur){
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&/<>*+=';
+  const start=performance.now();
+  el.classList.add('decoding');
+  if(el._raf) cancelAnimationFrame(el._raf);
+  const tick=(now)=>{
+    const p=Math.min(1,(now-start)/dur);
+    const reveal=Math.floor(p*text.length);
+    let out='';
+    for(let i=0;i<text.length;i++){
+      const ch=text[i];
+      out += (i<reveal || ch===' ') ? ch : chars[(Math.random()*chars.length)|0];
+    }
+    el.textContent=out;
+    if(p<1){ el._raf=requestAnimationFrame(tick); }
+    else { el.textContent=text; el.classList.remove('decoding'); el._raf=null; }
+  };
+  el._raf=requestAnimationFrame(tick);
+}
+function makeParticles(){
+  if(REDUCE_MOTION) return;
+  const box=document.getElementById('fxParticles'); if(!box || box.childElementCount) return;
+  for(let i=0;i<14;i++){
+    const s=document.createElement('i');
+    const dur=8+Math.random()*10;
+    s.style.left=(Math.random()*100)+'vw';
+    const sz=(2+Math.random()*2.4).toFixed(1)+'px';
+    s.style.width=sz; s.style.height=sz;
+    s.style.animationDuration=dur+'s';
+    s.style.animationDelay=(-Math.random()*dur)+'s';
+    box.appendChild(s);
+  }
+}
+function bootFx(){
+  const el=document.getElementById('bootFx'); if(!el) return;
+  el.classList.remove('run'); void el.offsetWidth; el.classList.add('run');
+  setTimeout(()=>el.classList.remove('run'), 1300);
+}
+makeParticles();
+
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9.]+/g,'-').replace(/^-|-$/g,'')}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 let toastTimer;
