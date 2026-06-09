@@ -343,6 +343,25 @@
   @keyframes sdotFloat{0%{transform:translate(0,0) scale(.55);opacity:0}15%{opacity:var(--op,.5)}85%{opacity:calc(var(--op,.5) * .5)}100%{transform:translate(var(--dx,0), calc(-1 * var(--rise,520px))) scale(1.05);opacity:0}}
 
   @media (prefers-reduced-motion: reduce){ .bg-nebula span,.stage-floor,.stage-depth .sdot{animation:none!important} }
+  /* ---- sci-fi asset loader ---- */
+  #loaderOverlay{position:absolute;inset:0;z-index:4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(8,8,11,.82);backdrop-filter:blur(6px);border-radius:20px}
+  #loaderOverlay.show{display:flex;animation:fade .25s ease}
+  .lo-wrap{position:relative;width:96px;height:96px;display:grid;place-items:center}
+  #loaderCube{animation:loaderSpin 7s linear infinite,loaderPulse 2.2s ease-in-out infinite}
+  @keyframes loaderSpin{to{transform:rotate(360deg)}}
+  @keyframes loaderPulse{0%,100%{filter:drop-shadow(0 0 7px rgba(205,242,74,.45))}50%{filter:drop-shadow(0 0 22px rgba(205,242,74,.95))}}
+  #loaderPath{stroke-dasharray:200 210;stroke-dashoffset:0;animation:dashRun 2.2s linear infinite}
+  @keyframes dashRun{to{stroke-dashoffset:-410}}
+  .lo-orbit{position:absolute;inset:-4px;animation:orbitSpin 2.8s linear infinite}
+  @keyframes orbitSpin{to{transform:rotate(360deg)}}
+  .lo-dot{position:absolute;top:0;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:var(--signal);box-shadow:0 0 14px var(--signal),0 0 28px rgba(205,242,74,.5)}
+  .lo-pct{font-family:"Space Mono",monospace;font-size:30px;font-weight:700;color:var(--signal);text-shadow:0 0 20px rgba(205,242,74,.55);letter-spacing:.04em;min-width:4.5ch;text-align:center}
+  .lo-bar{width:150px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+  .lo-fill{height:100%;width:0;background:linear-gradient(90deg,#9bbe2e,var(--signal));border-radius:2px;box-shadow:0 0 12px rgba(205,242,74,.7);transition:width .25s ease-out}
+  .lo-label{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:var(--text-3);animation:lblBlink 1.4s steps(1) infinite}
+  @keyframes lblBlink{50%{opacity:.28}}
+
+  @media (prefers-reduced-motion: reduce){ #loaderCube,#loaderPath,.lo-orbit,.lo-label{animation:none!important} }
 </style>
 </head>
 <body>
@@ -416,6 +435,20 @@
       <div class="stage">
         <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
         <div class="fx-lines"></div>
+        <div id="loaderOverlay">
+          <div class="lo-wrap">
+            <svg id="loaderCube" viewBox="0 0 100 100" width="90" height="90" fill="none" aria-hidden="true">
+              <path stroke="rgba(205,242,74,.13)" stroke-width="9" stroke-linecap="round"
+                d="M50 8 L87.5 29 L87.5 71 L50 92 L12.5 71 L12.5 29 Z M12.5 29 L50 50 L87.5 29 M50 50 L50 92"/>
+              <path id="loaderPath" stroke="#cdf24a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M50 8 L87.5 29 L87.5 71 L50 92 L12.5 71 L12.5 29 Z M12.5 29 L50 50 L87.5 29 M50 50 L50 92"/>
+            </svg>
+            <div class="lo-orbit"><div class="lo-dot"></div></div>
+          </div>
+          <div class="lo-pct" id="loaderPct">0%</div>
+          <div class="lo-bar"><div class="lo-fill" id="loaderFill"></div></div>
+          <div class="lo-label">SCANNING ASSET</div>
+        </div>
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
@@ -541,7 +574,7 @@
     <div class="mbody">
       <p style="color:var(--text-2);font-size:14px">Scan to open <b id="shareName" style="color:var(--text)">this model</b> in AR — Android uses the GLB, iPhone uses the USDZ automatically.</p>
       <div class="qr-card-wrap"><canvas id="qrCanvas" width="720" height="880" aria-label="Shareable QR code"></canvas></div>
-      <div id="qrRaw" style="display:none"></div>
+      <div id="qrRaw" style="visibility:hidden;position:fixed;left:-9999px;top:-9999px;width:320px;height:320px;overflow:hidden"></div>
       <div>
         <span class="eyebrow">Public link</span>
         <div class="linkrow" style="margin-top:8px"><input id="shareLink" readonly /><button class="btn btn-ghost" onclick="copyLink()">Copy</button></div>
@@ -668,7 +701,7 @@ async function loadAssets(){
 }
 function showSample(){
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
-  v.style.display=''; empty.style.display='none';
+  v.style.display=''; empty.style.display='none'; showLoader();
   v.removeAttribute('ios-src'); v.setAttribute('src',SAMPLE); v.setAttribute('auto-rotate','');
   setStageName('Sample preview');
   document.getElementById('nowFmt').textContent='DEMO';
@@ -756,7 +789,7 @@ function loadAsset(id){
   activeId=id;
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
   if(a.src){
-    v.style.display=''; empty.style.display='none';
+    v.style.display=''; empty.style.display='none'; showLoader();
     v.setAttribute('src',a.src);
     document.getElementById('nowDim').textContent='loading…';
     v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
@@ -837,7 +870,7 @@ function showPreview(){
   wrap.style.display='flex';
   // load into the main AR viewer / stage
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
-  v.style.display=''; empty.style.display='none';
+  v.style.display=''; empty.style.display='none'; showLoader();
   if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
   v.setAttribute('src',previewGlbUrl);
   activeId=null; renderRepo();
@@ -978,8 +1011,10 @@ function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo
 
 async function drawQRCard(link, name){
   const raw=document.getElementById('qrRaw'); raw.innerHTML='';
-  const QS=496; // QR pixels (2x of 248 logical for crispness)
+  const QS=300; // 300px is crisp enough; 496 caused iOS canvas drawImage issues
   if(window.QRCode){ new QRCode(raw,{text:link,width:QS,height:QS,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }
+  // wait one tick for qrcodejs to finish rendering into the DOM
+  await new Promise(r=>setTimeout(r,80));
   const node = raw.querySelector('canvas') || raw.querySelector('img');
   await fontsReady();
   const render=()=>composeCard(node,name);
@@ -1237,6 +1272,8 @@ function makeStageDots(){
     }
   });
 }
+function showLoader(){ const el=document.getElementById('loaderOverlay'); if(!el) return; el.querySelector('#loaderPct').textContent='0%'; el.querySelector('#loaderFill').style.width='0'; el.classList.add('show'); }
+function hideLoader(){ const el=document.getElementById('loaderOverlay'); if(el) el.classList.remove('show'); }
 function makeParticles(){
   if(REDUCE_MOTION) return;
   const box=document.getElementById('fxParticles'); if(!box || box.childElementCount) return;
@@ -1272,8 +1309,15 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3200)}
 document.getElementById('shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')closeShare()});
-document.getElementById('stageViewer').addEventListener('load', updateAnimBtn);
+document.getElementById('stageViewer').addEventListener('load', ()=>{ updateAnimBtn(); hideLoader(); });
 document.getElementById('stageViewer').addEventListener('finished', ()=>setAnimIcon(false));
+document.getElementById('stageViewer').addEventListener('progress', e=>{
+  const p=Math.round((e.detail.totalProgress||0)*100);
+  const pct=document.getElementById('loaderPct'), fill=document.getElementById('loaderFill');
+  if(pct) pct.textContent=p+'%';
+  if(fill) fill.style.width=p+'%';
+});
+document.getElementById('stageViewer').addEventListener('error', ()=>hideLoader());
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
 ['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
