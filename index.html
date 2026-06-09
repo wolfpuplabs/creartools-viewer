@@ -216,6 +216,13 @@
   .qrbox{width:174px;height:174px;margin:0 auto;border-radius:14px;background:#fff;padding:12px;display:grid;place-items:center}
   .qrbox img,.qrbox canvas{width:150px!important;height:150px!important}
   .linkrow{display:flex;gap:8px}
+  .preview-wrap{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px;border:1.5px dashed rgba(205,242,74,.45);border-radius:13px;background:rgba(205,242,74,.05);animation:rise .4s var(--ease) both}
+  .preview-info{flex:1;min-width:0}
+  .preview-info .pv-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .preview-info .pv-sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.04em;color:var(--signal);margin-top:3px}
+  .qr-card-wrap{display:flex;justify-content:center}
+  #qrCanvas{width:232px;max-width:78%;height:auto;border-radius:18px;box-shadow:0 24px 60px -24px rgba(0,0,0,.8)}
+  .share-actions{display:flex;gap:8px}
   .linkrow input{flex:1;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);color:var(--text-2);font-family:"Space Mono",monospace;font-size:12px}
   .closeX{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line)}
   .closeX:hover{color:var(--text);background:var(--surface-3)}
@@ -356,10 +363,23 @@
           <input type="file" id="glbInput" accept=".glb,.gltf" hidden />
           <input type="file" id="usdzInput" accept=".usdz" hidden />
 
+          <div class="preview-wrap" id="previewWrap" style="display:none">
+            <div class="thumb" id="previewThumb">
+              <model-viewer id="previewMV" camera-controls auto-rotate disable-zoom interaction-prompt="none" exposure="1"></model-viewer>
+            </div>
+            <div class="preview-info">
+              <div class="pv-name" id="previewName">model.glb</div>
+              <div class="pv-sub" id="previewSub">Live preview · not saved yet</div>
+            </div>
+            <button class="iconbtn del" title="Discard preview" onclick="discardPreview()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+
           <button class="btn btn-primary btn-block" id="deployBtn" style="margin-top:14px;opacity:.5;pointer-events:none" onclick="deploy()">
             <span class="spin"></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
-            <span class="lbl">Deploy to repository</span>
+            <span class="lbl">Deploy &amp; save to share</span>
           </button>
         </div>
       </div>
@@ -401,11 +421,18 @@
   <div class="modal">
     <div class="mhead"><h3>Share &amp; launch AR</h3><button class="closeX" onclick="closeShare()">✕</button></div>
     <div class="mbody">
-      <p style="color:var(--text-2);font-size:14px">Scan with a phone to open <b id="shareName" style="color:var(--text)">this model</b> in AR. Android uses the GLB, iPhone uses the USDZ automatically.</p>
-      <div class="qrbox"><div id="qr"></div></div>
+      <p style="color:var(--text-2);font-size:14px">Scan to open <b id="shareName" style="color:var(--text)">this model</b> in AR — Android uses the GLB, iPhone uses the USDZ automatically.</p>
+      <div class="qr-card-wrap"><canvas id="qrCanvas" width="720" height="880" aria-label="Shareable QR code"></canvas></div>
+      <div id="qrRaw" style="display:none"></div>
       <div>
         <span class="eyebrow">Public link</span>
-        <div class="linkrow" style="margin-top:8px"><input id="shareLink" readonly /><button class="btn btn-primary" onclick="copyLink()">Copy</button></div>
+        <div class="linkrow" style="margin-top:8px"><input id="shareLink" readonly /><button class="btn btn-ghost" onclick="copyLink()">Copy</button></div>
+      </div>
+      <div class="share-actions">
+        <button class="btn btn-primary btn-block" onclick="saveQR()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Save QR to Photos
+        </button>
       </div>
     </div>
   </div>
@@ -429,6 +456,8 @@ const safeStorage = {
 
 let sb=null, user=null, assets=[], activeId=null, authMode='login';
 let pendingGlb=null, pendingUsdz=null;
+let previewGlbUrl=null, previewUsdzUrl=null, previewing=false;
+let qrName='', qrLink='';
 
 const isUsdz = u => /\.usdz(\?|$)/i.test(u||'');
 
@@ -657,14 +686,54 @@ function pick(kind, file){
     document.getElementById('glbText').textContent=file.name;
     document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
     const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf)$/i,'');
+    if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
+    previewGlbUrl=URL.createObjectURL(file);
+    showPreview();
   }else{
     if(!/\.usdz$/i.test(file.name)){ toast('USDZ slot accepts .usdz only'); return; }
     pendingUsdz=file; dzUsdz.classList.add('has');
     document.getElementById('usdzText').textContent=file.name;
     document.getElementById('usdzSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
+    if(previewUsdzUrl) URL.revokeObjectURL(previewUsdzUrl);
+    previewUsdzUrl=URL.createObjectURL(file);
+    if(pendingGlb) showPreview();
   }
   const b=document.getElementById('deployBtn'), on=!!pendingGlb;
   b.style.opacity=on?'1':'.5'; b.style.pointerEvents=on?'auto':'none';
+}
+function previewName(){ return document.getElementById('assetName').value.trim() || (pendingGlb?pendingGlb.name.replace(/\.(glb|gltf)$/i,''):'Preview'); }
+function showPreview(){
+  if(!previewGlbUrl) return;
+  previewing=true;
+  const nm=previewName();
+  const fmt=pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB';
+  // small preview thumbnail in the panel
+  const wrap=document.getElementById('previewWrap'), pmv=document.getElementById('previewMV');
+  pmv.setAttribute('src',previewGlbUrl);
+  document.getElementById('previewName').textContent=nm;
+  document.getElementById('previewSub').textContent=(pendingUsdz?'GLB + USDZ':fmt)+' · live preview, not saved';
+  wrap.style.display='flex';
+  // load into the main AR viewer / stage
+  const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
+  v.style.display=''; empty.style.display='none';
+  if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
+  v.setAttribute('src',previewGlbUrl);
+  activeId=null; renderRepo();
+  document.getElementById('nowName').textContent=nm;
+  document.getElementById('nowFmt').textContent='PREVIEW';
+  document.getElementById('nowDim').textContent='not saved yet';
+  document.getElementById('mFormat').textContent=fmt;
+  document.getElementById('mSize').textContent=pendingGlb?(pendingGlb.size/1048576).toFixed(1)+' MB':'—';
+  document.getElementById('mAr').textContent='Preview';
+  v.addEventListener('load',()=>{ if(previewing) document.getElementById('nowDim').textContent='preview ✓'; },{once:true});
+}
+function discardPreview(){
+  if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
+  if(previewUsdzUrl) URL.revokeObjectURL(previewUsdzUrl);
+  previewGlbUrl=previewUsdzUrl=null; previewing=false;
+  resetUpload();
+  // restore the viewer to the current saved asset (or sample)
+  if(assets[0]) loadAsset(assets[0].id); else showSample();
 }
 function deployLoading(on){ document.getElementById('deployBtn').classList.toggle('loading',on); }
 async function deploy(){
@@ -705,6 +774,12 @@ function resetUpload(){
   document.getElementById('usdzSub').textContent='native iPhone / iPad AR';
   document.getElementById('assetName').value=''; glbInput.value=''; usdzInput.value='';
   const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
+  // clear preview
+  if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
+  if(previewUsdzUrl) URL.revokeObjectURL(previewUsdzUrl);
+  previewGlbUrl=previewUsdzUrl=null; previewing=false;
+  document.getElementById('previewWrap').style.display='none';
+  document.getElementById('previewMV').removeAttribute('src');
 }
 
 /* ===================== VIEWPORT TOOLS ===================== */
@@ -749,18 +824,100 @@ function openShare(id){
   const params=new URLSearchParams(); params.set('name',a.name);
   if(a.src) params.set('model',a.src);
   if(a.iosSrc) params.set('ios',a.iosSrc);
-  const link=`${location.origin}${location.pathname}?${params.toString()}`;
-  document.getElementById('shareLink').value=link;
+  qrLink=`${location.origin}${location.pathname}?${params.toString()}`;
+  qrName=a.name;
+  document.getElementById('shareLink').value=qrLink;
   document.getElementById('shareName').textContent=a.name;
-  makeQR(link);
+  drawQRCard(qrLink, a.name);
   document.getElementById('shareModal').classList.add('show');
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
-function makeQR(text){
-  const el=document.getElementById('qr'); el.innerHTML='';
-  if(window.QRCode){ new QRCode(el,{text,width:150,height:150,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }
-  else { el.innerHTML='<div class="mono" style="color:#0a0a0c;font-size:11px;padding:20px;text-align:center">QR unavailable</div>'; }
+
+async function fontsReady(){ try{ await Promise.all([document.fonts.load('800 30px Syne'),document.fonts.load('700 15px "Space Mono"')]); }catch(e){} }
+
+// draw the brand cube glyph (24-grid) centred at cx,cy with grid-unit scale s
+function cubeGlyph(ctx, cx, cy, s, lw){
+  const pts={A:[12,2],B:[21,7],C:[21,17],D:[12,22],E:[3,17],F:[3,7],G:[12,12]};
+  const P=k=>[cx+(pts[k][0]-12)*s, cy+(pts[k][1]-12)*s];
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.beginPath(); ['F','A','B','G'].forEach((k,i)=>{const[x,y]=P(k); i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.closePath();
+  ctx.fillStyle='rgba(205,242,74,.22)'; ctx.fill();
+  ctx.beginPath(); ['A','B','C','D','E','F'].forEach((k,i)=>{const[x,y]=P(k); i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.closePath();
+  const seg=(a,b)=>{const[x1,y1]=P(a),[x2,y2]=P(b); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2)};
+  seg('G','F'); seg('G','B'); seg('G','D');
+  ctx.strokeStyle='#cdf24a'; ctx.lineWidth=lw; ctx.stroke();
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+async function drawQRCard(link, name){
+  const raw=document.getElementById('qrRaw'); raw.innerHTML='';
+  const QS=496; // QR pixels (2x of 248 logical for crispness)
+  if(window.QRCode){ new QRCode(raw,{text:link,width:QS,height:QS,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }
+  const node = raw.querySelector('canvas') || raw.querySelector('img');
+  await fontsReady();
+  const render=()=>composeCard(node,name);
+  if(node && node.tagName==='IMG' && !node.complete){ node.onload=render; } else { render(); }
+}
+function composeCard(qrNode, name){
+  const c=document.getElementById('qrCanvas'); const ctx=c.getContext('2d');
+  const DPR=2, W=360, H=440;
+  c.width=W*DPR; c.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  // background card
+  roundRect(ctx,0,0,W,H,28); ctx.save(); ctx.clip();
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#17171d'); g.addColorStop(1,'#0a0a0c');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const glow=ctx.createRadialGradient(W/2,70,10,W/2,70,260); glow.addColorStop(0,'rgba(205,242,74,.16)'); glow.addColorStop(1,'rgba(205,242,74,0)');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+  ctx.restore();
+  roundRect(ctx,1.5,1.5,W-3,H-3,27); ctx.strokeStyle='rgba(205,242,74,.18)'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // brand row
+  cubeGlyph(ctx, 40, 40, 1.15, 2.2);
+  ctx.fillStyle='#cdf24a'; ctx.textBaseline='middle'; ctx.textAlign='left';
+  ctx.font='700 14px "Space Mono", monospace';
+  ctx.fillText('CREARTOR·AR', 58, 41);
+
+  // white QR plate
+  const qx=56, qy=72, qs=248;
+  ctx.fillStyle='#ffffff'; roundRect(ctx,qx-8,qy-8,qs+16,qs+16,18); ctx.fill();
+  if(qrNode){ try{ ctx.drawImage(qrNode, qx, qy, qs, qs); }catch(e){} }
+  else { ctx.fillStyle='#0a0a0c'; ctx.font='12px "Space Mono"'; ctx.textAlign='center'; ctx.fillText('QR unavailable', W/2, qy+qs/2); }
+
+  // centre logo chip on the QR (QR uses high error-correction, so this is safe)
+  const lc=qs*0.2, lx=W/2, ly=qy+qs/2;
+  ctx.fillStyle='#ffffff'; roundRect(ctx,lx-lc/2,ly-lc/2,lc,lc,12); ctx.fill();
+  ctx.strokeStyle='rgba(10,10,12,.08)'; ctx.lineWidth=1; ctx.stroke();
+  cubeGlyph(ctx, lx, ly, (lc*0.72)/20, 2.4);
+
+  // model name
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#f3f3ef'; ctx.font='800 22px "Syne", sans-serif';
+  let t=name||'3D model'; if(t.length>22) t=t.slice(0,21)+'…';
+  ctx.fillText(t, W/2, qy+qs+44);
+
+  // caption
+  ctx.fillStyle='#8a8a92'; ctx.font='700 11px "Space Mono", monospace';
+  ctx.fillText('SCAN TO VIEW IN AR', W/2, qy+qs+68);
+}
+
+async function saveQR(){
+  const c=document.getElementById('qrCanvas');
+  c.toBlob(async (blob)=>{
+    if(!blob){ toast('Could not render QR image'); return; }
+    const fname=`creartor-ar-${slug(qrName||'model')}.png`;
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:'Creartor AR', text:qrName?('Scan to view '+qrName+' in AR'):'Scan to view in AR'}); return; }
+      catch(e){ if(e && e.name==='AbortError') return; }
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    toast('QR image saved');
+  },'image/png');
 }
 
 /* ===================== SHARED PUBLIC VIEW ===================== */
@@ -787,6 +944,7 @@ document.getElementById('stageViewer').addEventListener('finished', ()=>setAnimI
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShare()});
 ['email','password'].forEach(id=>{const el=document.getElementById(id);el&&el.addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth()})});
+document.getElementById('assetName').addEventListener('input',()=>{ if(previewing){ const nm=previewName(); document.getElementById('previewName').textContent=nm; document.getElementById('nowName').textContent=nm; } });
 </script>
 </body>
 </html>
