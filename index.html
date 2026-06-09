@@ -311,6 +311,17 @@
     .bg-scan,.scan-sweep{display:none}
     #bootFx.run{animation-duration:.4s}
   }
+  /* anime speed-lines burst on AR */
+  #speedLines{position:fixed;inset:0;z-index:66;pointer-events:none;opacity:0;
+    background:repeating-conic-gradient(from 0deg at 50% 50%, rgba(205,242,74,0) 0deg, rgba(205,242,74,0) 2.1deg, rgba(205,242,74,.6) 2.1deg, rgba(205,242,74,.6) 3deg);
+    -webkit-mask:radial-gradient(circle at 50% 50%, transparent 22%, #000 56%);
+    mask:radial-gradient(circle at 50% 50%, transparent 22%, #000 56%);}
+  #speedLines.run{animation:speedZoom .72s ease-out}
+  @keyframes speedZoom{0%{opacity:0;transform:scale(1.55) rotate(-2deg)}22%{opacity:1}100%{opacity:0;transform:scale(1) rotate(0deg)}}
+  .sndbtn{padding:9px 11px}
+  .sndbtn.on{color:var(--signal);border-color:rgba(205,242,74,.4)}
+
+  @media (prefers-reduced-motion: reduce){ #speedLines{display:none} }
 </style>
 </head>
 <body>
@@ -363,6 +374,10 @@
     <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CREARTOR<b>·AR</b></span></a>
     <div class="bar-right">
       <span class="pill"><span class="dot live"></span><span id="userEmail">workspace</span></span>
+      <button class="btn btn-ghost sndbtn on" id="soundBtn" title="Sound FX on/off" onclick="toggleSound()">
+        <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+        <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
+      </button>
       <div class="avatar" id="avatar">AR</div>
       <button class="btn btn-ghost" onclick="logout()" style="padding:9px 14px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="logout-text">Logout</span>
@@ -484,7 +499,7 @@
       <span class="nm" id="sharedName">3D model</span>
     </div>
     <div class="hud"><div></div><div class="toolbar">
-      <button class="tool ar" onclick="document.getElementById('sharedViewer').activateAR?.()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>VIEW IN AR</button>
+      <button class="tool ar" onclick="launchSharedAR()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>VIEW IN AR</button>
     </div></div>
   </div>
 </div>
@@ -511,6 +526,7 @@
   </div>
 </div>
 
+<div id="speedLines"></div>
 <div id="bootFx"><div class="boot-line"></div><div class="boot-txt" id="bootTxt">SYSTEM ONLINE</div></div>
 <div id="toast"><span class="dot"></span><span id="toastMsg">Done</span></div>
 
@@ -836,7 +852,7 @@ async function deploy(){
     const r=ins.data;
     assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path});
     renderRepo(); loadAsset(r.id); resetUpload();
-    toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓');
+    toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
 }
@@ -891,7 +907,11 @@ function toggleRotate(){
 }
 function resetCam(){const v=document.getElementById('stageViewer');v.cameraOrbit='0deg 75deg auto';v.fieldOfView='auto';toast('Camera reset')}
 function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
-function launchAR(){const v=document.getElementById('stageViewer');if(v.canActivateAR)v.activateAR();else toast('Open on a mobile device to view in AR')}
+function launchAR(){
+  const v=document.getElementById('stageViewer');
+  speedLines(); sfxAR();
+  setTimeout(()=>{ if(v.canActivateAR) v.activateAR(); else toast('Open on a mobile device to view in AR'); }, 240);
+}
 
 /* ===================== SHARE ===================== */
 function openShare(id){
@@ -1011,6 +1031,66 @@ function goWorkspace(){ location.href=location.origin+location.pathname; }
 /* ===================== UTILS ===================== */
 /* ===================== FX HELPERS ===================== */
 const REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+/* ---- optional sound FX (synthesised, no audio files) ---- */
+function loadPref(k,def){ try{ const v=localStorage.getItem('creartor_'+k); return v===null?def:v==='1'; }catch(e){ return def; } }
+function savePref(k,val){ try{ localStorage.setItem('creartor_'+k, val?'1':'0'); }catch(e){} }
+let soundOn = loadPref('sfx', true);
+let actx=null, masterGain=null;
+function ensureAudio(){
+  if(actx){ if(actx.state==='suspended') actx.resume(); return actx; }
+  try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    masterGain=actx.createGain(); masterGain.gain.value=0.16; masterGain.connect(actx.destination);
+  }catch(e){ actx=null; }
+  return actx;
+}
+function blip(f0,f1,dur,type='sine',vol=1,delay=0){
+  if(!soundOn) return; const c=ensureAudio(); if(!c) return;
+  const t0=c.currentTime+delay, o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f0,t0);
+  if(f1&&f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t0+dur);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol,t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(masterGain); o.start(t0); o.stop(t0+dur+0.05);
+}
+function noiseSwell(dur,vol=0.3,delay=0){
+  if(!soundOn) return; const c=ensureAudio(); if(!c) return;
+  const t0=c.currentTime+delay, n=c.createBufferSource();
+  const buf=c.createBuffer(1, Math.max(1,Math.floor(c.sampleRate*dur)), c.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  n.buffer=buf;
+  const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.setValueAtTime(700,t0);
+  bp.frequency.exponentialRampToValueAtTime(3200,t0+dur); bp.Q.value=0.7;
+  const g=c.createGain(); g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol,t0+dur*0.4); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  n.connect(bp); bp.connect(g); g.connect(masterGain); n.start(t0); n.stop(t0+dur+0.05);
+}
+function sfxBoot(){ blip(170,720,0.5,'sawtooth',0.45); blip(420,920,0.45,'sine',0.28,0.05); noiseSwell(0.5,0.22); blip(1245,1245,0.12,'sine',0.22,0.5); }
+function sfxAR(){ blip(300,1500,0.18,'square',0.32); blip(620,1900,0.16,'sine',0.28,0.05); noiseSwell(0.22,0.28,0.02); }
+function sfxOk(){ blip(784,1046,0.1,'sine',0.28); blip(1046,1318,0.12,'sine',0.22,0.07); }
+function toggleSound(){ soundOn=!soundOn; savePref('sfx',soundOn); updateSoundBtn(); if(soundOn){ ensureAudio(); sfxOk(); } }
+function updateSoundBtn(){
+  const b=document.getElementById('soundBtn'); if(!b) return;
+  b.classList.toggle('on',soundOn);
+  b.querySelector('.i-on').style.display = soundOn?'block':'none';
+  b.querySelector('.i-off').style.display = soundOn?'none':'block';
+}
+
+/* ---- anime speed-lines burst ---- */
+function speedLines(){
+  if(REDUCE_MOTION) return;
+  const el=document.getElementById('speedLines'); if(!el) return;
+  el.classList.remove('run'); void el.offsetWidth; el.classList.add('run');
+  setTimeout(()=>el.classList.remove('run'), 740);
+}
+function launchSharedAR(){
+  const v=document.getElementById('sharedViewer');
+  speedLines(); sfxAR();
+  setTimeout(()=>{ if(v && v.activateAR) v.activateAR(); }, 240);
+}
+
 function setStageName(text){
   const el=document.getElementById('nowName');
   if(REDUCE_MOTION){ el.textContent=text; return; }
@@ -1052,9 +1132,11 @@ function makeParticles(){
 function bootFx(){
   const el=document.getElementById('bootFx'); if(!el) return;
   el.classList.remove('run'); void el.offsetWidth; el.classList.add('run');
+  sfxBoot();
   setTimeout(()=>el.classList.remove('run'), 1300);
 }
 makeParticles();
+updateSoundBtn();
 
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9.]+/g,'-').replace(/^-|-$/g,'')}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
