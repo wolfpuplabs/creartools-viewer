@@ -1147,12 +1147,29 @@ async function captureStage(){
 // generate a QR node (canvas/img) for the link
 async function makeQRNode(link){
   const raw=document.getElementById('qrRaw'); raw.innerHTML='';
-  try{ if(window.QRCode) new QRCode(raw,{text:link,width:380,height:380,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }catch(e){}
+  if(window.QRCode){
+    // long Supabase URLs overflow the smallest-capacity level (H); use M, fall back to L
+    const levels=[QRCode.CorrectLevel.M, QRCode.CorrectLevel.L];
+    for(const lvl of levels){
+      raw.innerHTML='';
+      try{ new QRCode(raw,{text:link,width:420,height:420,colorDark:'#0a0a0c',colorLight:'#ffffff',correctLevel:lvl}); break; }
+      catch(e){ /* data too long for this level — try a lower one */ }
+    }
+  }
   await new Promise(r=>setTimeout(r,60));
-  const node = raw.querySelector('canvas') || raw.querySelector('img');
+  let node = raw.querySelector('canvas') || raw.querySelector('img');
   // qrcodejs may produce an <img> (data URL) that isn't decoded yet — wait so drawImage isn't blank
   if(node && node.tagName==='IMG' && !node.complete){
     await new Promise(res=>{ node.onload=res; node.onerror=res; setTimeout(res,700); });
+  }
+  // fallback: if the local library produced nothing, fetch a QR image (CORS-enabled, drawable on canvas)
+  if(!node){
+    try{
+      const fb=new Image(); fb.crossOrigin='anonymous';
+      const ok=await new Promise(res=>{ fb.onload=()=>res(true); fb.onerror=()=>res(false); setTimeout(()=>res(false),3500);
+        fb.src='https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=0&ecc=M&data='+encodeURIComponent(link); });
+      if(ok) node=fb;
+    }catch(e){}
   }
   return node;
 }
@@ -1160,7 +1177,7 @@ function withTimeout(p, ms){ return Promise.race([ Promise.resolve(p), new Promi
 async function buildShareCard(a, token, meta){
   const live=()=>token===undefined || token===shareToken;
   if(!meta) meta={ name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
-  const qrNode = await withTimeout(makeQRNode(qrLink), 1800);
+  const qrNode = await withTimeout(makeQRNode(qrLink), 4500);
   if(!live()) return;
   // draw with QR + placeholder right away (fonts may still be fallback — that's fine)
   composeTradingCard({assetImg:null, qrNode, ...meta});
