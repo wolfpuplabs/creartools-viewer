@@ -400,6 +400,10 @@
         <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
         <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
       </button>
+      <button class="btn btn-ghost sndbtn" id="musicBtn" title="Ambient music on/off" onclick="toggleMusic()">
+        <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M9 18V5l12-2v6"/><circle cx="6" cy="18" r="3"/><path d="M3 3l18 18"/></svg>
+      </button>
       <div class="avatar" id="avatar">AR</div>
       <button class="btn btn-ghost" onclick="logout()" style="padding:9px 14px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="logout-text">Logout</span>
@@ -631,6 +635,7 @@ async function submitAuth(){
 }
 async function logout(){
   try{ await sb.auth.signOut(); }catch(e){}
+  stopAmbient();
   user=null; assets=[]; activeId=null;
   document.getElementById('app').style.display='none';
   document.getElementById('authGate').style.display='grid';
@@ -642,6 +647,7 @@ function enterApp(){
   document.getElementById('authGate').style.display='none';
   document.getElementById('app').style.display='flex';
   bootFx();
+  if(musicOn) setTimeout(startAmbient, 600);
   loadAssets();
 }
 
@@ -753,7 +759,7 @@ function loadAsset(id){
     v.style.display=''; empty.style.display='none';
     v.setAttribute('src',a.src);
     document.getElementById('nowDim').textContent='loading…';
-    v.addEventListener('load',()=>document.getElementById('nowDim').textContent='loaded ✓',{once:true});
+    v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
   }else{
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
     document.getElementById('nowDim').textContent='AR-only';
@@ -1061,6 +1067,7 @@ const REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduce
 function loadPref(k,def){ try{ const v=localStorage.getItem('creartor_'+k); return v===null?def:v==='1'; }catch(e){ return def; } }
 function savePref(k,val){ try{ localStorage.setItem('creartor_'+k, val?'1':'0'); }catch(e){} }
 let soundOn = loadPref('sfx', true);
+let musicOn = loadPref('bgm', false);
 let actx=null, masterGain=null;
 function ensureAudio(){
   if(actx){ if(actx.state==='suspended') actx.resume(); return actx; }
@@ -1101,6 +1108,76 @@ function updateSoundBtn(){
   b.classList.toggle('on',soundOn);
   b.querySelector('.i-on').style.display = soundOn?'block':'none';
   b.querySelector('.i-off').style.display = soundOn?'none':'block';
+}
+
+/* ---- scanning sweep SFX (radar) — caller decides whether to play ---- */
+function sfxScan(vol=0.16){
+  const c=ensureAudio(); if(!c) return;
+  const t0=c.currentTime, dur=1.1;
+  const n=c.createBufferSource();
+  const buf=c.createBuffer(1, Math.floor(c.sampleRate*dur), c.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; n.buffer=buf;
+  const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=6;
+  bp.frequency.setValueAtTime(380,t0); bp.frequency.exponentialRampToValueAtTime(3600,t0+dur);
+  const g=c.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+0.25); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  n.connect(bp); bp.connect(g); g.connect(masterGain); n.start(t0); n.stop(t0+dur+0.05);
+  const o=c.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(880,t0); o.frequency.exponentialRampToValueAtTime(1760,t0+dur);
+  const og=c.createGain(); og.gain.setValueAtTime(0.0001,t0); og.gain.exponentialRampToValueAtTime(vol*0.45,t0+0.3); og.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(og); og.connect(masterGain); o.start(t0); o.stop(t0+dur+0.05);
+}
+
+/* ---- space ambient BGM (synthesised drone + evolving pad + scan loop) ---- */
+let ambient=null, ambGain=null, scanTimer=null;
+function startAmbient(){
+  const c=ensureAudio(); if(!c || ambient) return;
+  ambGain=c.createGain(); ambGain.gain.value=0.0001; ambGain.connect(masterGain);
+  const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=820; lp.Q.value=0.7; lp.connect(ambGain);
+  // spacious feedback delay
+  const delay=c.createDelay(1.0); delay.delayTime.value=0.5;
+  const fb=c.createGain(); fb.gain.value=0.36; delay.connect(fb); fb.connect(delay);
+  const wet=c.createGain(); wet.gain.value=0.45; delay.connect(wet); wet.connect(ambGain);
+  lp.connect(delay);
+  // drone chord (low, slightly detuned)
+  const freqs=[55,82.41,110,164.81], oscs=[];
+  freqs.forEach((f,i)=>{
+    const o=c.createOscillator(); o.type=i%2?'sine':'triangle'; o.frequency.value=f; o.detune.value=(i-1.5)*5;
+    const g=c.createGain(); g.gain.value=0.13/(i+1);
+    o.connect(g); g.connect(lp); o.start(); oscs.push(o);
+  });
+  // slow filter sweep + gentle tremolo for "breathing" space
+  const lfo=c.createOscillator(); lfo.frequency.value=0.05; const lfoG=c.createGain(); lfoG.gain.value=320;
+  lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
+  const trem=c.createOscillator(); trem.frequency.value=0.07; const tremG=c.createGain(); tremG.gain.value=0.05;
+  trem.connect(tremG); tremG.connect(ambGain.gain); trem.start();
+  // fade in
+  ambGain.gain.setValueAtTime(0.0001,c.currentTime);
+  ambGain.gain.exponentialRampToValueAtTime(0.42,c.currentTime+3.5);
+  ambient={oscs,lfo,trem};
+  // recurring radar scan, synced with the visual scan-sweep (~6s)
+  clearInterval(scanTimer);
+  scanTimer=setInterval(()=>{ if(musicOn) sfxScan(0.13); }, 6000);
+  setTimeout(()=>{ if(musicOn) sfxScan(0.13); }, 900);
+}
+function stopAmbient(){
+  clearInterval(scanTimer); scanTimer=null;
+  if(!ambient || !actx){ ambient=null; return; }
+  const c=actx, nodes=ambient; ambient=null;
+  try{
+    ambGain.gain.cancelScheduledValues(c.currentTime);
+    ambGain.gain.setValueAtTime(Math.max(0.0001,ambGain.gain.value),c.currentTime);
+    ambGain.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+1.2);
+  }catch(e){}
+  setTimeout(()=>{ try{ nodes.oscs.forEach(o=>o.stop()); nodes.lfo.stop(); nodes.trem.stop(); }catch(e){} }, 1400);
+}
+function toggleMusic(){
+  musicOn=!musicOn; savePref('bgm',musicOn); updateMusicBtn();
+  if(musicOn){ ensureAudio(); startAmbient(); } else { stopAmbient(); }
+}
+function updateMusicBtn(){
+  const b=document.getElementById('musicBtn'); if(!b) return;
+  b.classList.toggle('on',musicOn);
+  b.querySelector('.i-on').style.display = musicOn?'block':'none';
+  b.querySelector('.i-off').style.display = musicOn?'none':'block';
 }
 
 /* ---- anime speed-lines burst (inside the given viewport box) ---- */
@@ -1188,6 +1265,7 @@ function bootFx(){
 makeParticles();
 makeStageDots();
 updateSoundBtn();
+updateMusicBtn();
 
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9.]+/g,'-').replace(/^-|-$/g,'')}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
