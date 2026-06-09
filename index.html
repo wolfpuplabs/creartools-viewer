@@ -1079,14 +1079,15 @@ async function openShare(id){
   if(a.iosSrc) params.set('ios',a.iosSrc);
   qrLink=`${location.origin}${location.pathname}?${params.toString()}`;
   qrName=a.name;
+  const meta={ name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
   document.getElementById('shareLink').value=qrLink;
   document.getElementById('shareName').textContent=a.name;
-  // clear any previously drawn card so a stale image can't linger
-  try{ const cv=document.getElementById('qrCanvas'); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }catch(e){}
   document.getElementById('shareModal').classList.add('show');
+  // draw a placeholder immediately (synchronous, no awaits) so the card is NEVER blank
+  try{ composeTradingCard({assetImg:null, qrNode:null, ...meta}); }catch(e){}
   const cl=document.getElementById('cardLoading'); cl.classList.add('show');
   const watchdog=setTimeout(()=>cl.classList.remove('show'), 9000); // never let it stick
-  try{ await buildShareCard(a, myToken); }catch(e){ /* fallback already drawn */ }
+  try{ await buildShareCard(a, myToken, meta); }catch(e){ /* placeholder already drawn */ }
   clearTimeout(watchdog); if(myToken===shareToken) cl.classList.remove('show');
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
@@ -1147,17 +1148,18 @@ async function makeQRNode(link){
   return raw.querySelector('canvas') || raw.querySelector('img');
 }
 function withTimeout(p, ms){ return Promise.race([ Promise.resolve(p), new Promise(r=>setTimeout(()=>r(null), ms)) ]); }
-async function buildShareCard(a, token){
+async function buildShareCard(a, token, meta){
   const live=()=>token===undefined || token===shareToken;
-  const qrNode = await makeQRNode(qrLink);
+  if(!meta) meta={ name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
+  const qrNode = await withTimeout(makeQRNode(qrLink), 1800);
   if(!live()) return;
-  const meta={ qrNode, name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
-  await fontsReady();
-  if(!live()) return;
-  // 1) draw the card right away with the QR + placeholder so it's never blank / stuck
-  composeTradingCard({assetImg:null, ...meta});
+  // draw with QR + placeholder right away (fonts may still be fallback — that's fine)
+  composeTradingCard({assetImg:null, qrNode, ...meta});
   document.getElementById('cardLoading')?.classList.remove('show');
-  // 2) fetch the best available render (each step capped so it can't hang), then redraw
+  await withTimeout(fontsReady(), 1200);
+  if(!live()) return;
+  composeTradingCard({assetImg:null, qrNode, ...meta}); // redraw once webfonts are ready
+  // fetch the best available render (each step capped so it can't hang), then redraw
   let img=null;
   if(a.id===activeId)            img = await withTimeout(captureStage(), 2500);
   if(!live()) return;
@@ -1167,7 +1169,7 @@ async function buildShareCard(a, token){
   if(!live()) return;
   if(!img && a.src)              img = await withTimeout(captureAsset(a.src), 5000);
   if(!live()) return;
-  if(img) composeTradingCard({assetImg:img, ...meta});
+  if(img) composeTradingCard({assetImg:img, qrNode, ...meta});
 }
 
 function composeTradingCard({assetImg, qrNode, name, size, fmt}){
