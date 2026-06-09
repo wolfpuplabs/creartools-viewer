@@ -236,8 +236,11 @@
   #toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,140%);z-index:80;background:var(--surface-3);border:1px solid var(--line-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;transition:transform .45s var(--ease);box-shadow:0 20px 50px -20px rgba(0,0,0,.8);max-width:90vw}
   #toast.show{transform:translate(-50%,0)}
 
-  @media(max-width:920px){main{grid-template-columns:1fr}.auth-shell{grid-template-columns:1fr}.auth-aside{min-height:200px;order:-1}.auth-aside .cube{width:200px;opacity:.35}}
-  @media(max-width:680px){header.bar{padding:12px 16px}.logo .word{font-size:12px}#userEmail{max-width:96px}.stage{min-height:340px}main{gap:16px}.stage-meta{gap:14px}}
+  @media(max-width:920px){main{grid-template-columns:1fr}.auth-shell{grid-template-columns:1fr}.auth-aside{min-height:200px;order:-1}.auth-aside .cube{width:200px;opacity:.35}
+    .stage{aspect-ratio:auto;height:min(70vh,820px);height:min(70dvh,820px);min-height:480px}}
+  @media(max-width:680px){header.bar{padding:12px 16px}.logo .word{font-size:12px}#userEmail{max-width:96px}main{gap:16px}.stage-meta{gap:14px}
+    .stage{height:min(72vh,760px);height:min(72dvh,760px);min-height:440px}
+    #sharedView .sv-stage{margin:12px;min-height:70vh}}
   @media(max-width:520px){.bar .pill{display:none}.logout-text{display:none}.btn-ghost{padding:9px 11px}.auth-main,.auth-aside{padding:26px}#sharedView header{padding:14px 16px}#sharedView .sv-banner .nm{font-size:17px}}
   @media(max-width:480px){.toolbar{flex-wrap:wrap;justify-content:center}.modal .mbody{padding:20px}.stage-meta .m b{font-size:12px}}
   @media(max-width:380px){.logo .word{font-size:11px}.tool{width:38px;height:38px}.tool.ar{padding:0 12px}}
