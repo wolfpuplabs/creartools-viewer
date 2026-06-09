@@ -344,13 +344,13 @@
 
   @media (prefers-reduced-motion: reduce){ .bg-nebula span,.stage-floor,.stage-depth .sdot{animation:none!important} }
   /* ---- sci-fi asset loader ---- */
-  #loaderOverlay{position:absolute;inset:0;z-index:4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(8,8,11,.82);backdrop-filter:blur(6px);border-radius:20px}
-  #loaderOverlay.show{display:flex;animation:fade .25s ease}
+  #loaderOverlay,#loaderOverlayS{position:absolute;inset:0;z-index:4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(8,8,11,.82);backdrop-filter:blur(6px);border-radius:20px}
+  #loaderOverlay.show,#loaderOverlayS.show{display:flex;animation:fade .25s ease}
   .lo-wrap{position:relative;width:96px;height:96px;display:grid;place-items:center}
-  #loaderCube{animation:loaderSpin 7s linear infinite,loaderPulse 2.2s ease-in-out infinite}
+  #loaderCube,.lo-cube{animation:loaderSpin 7s linear infinite,loaderPulse 2.2s ease-in-out infinite}
   @keyframes loaderSpin{to{transform:rotate(360deg)}}
   @keyframes loaderPulse{0%,100%{filter:drop-shadow(0 0 7px rgba(205,242,74,.45))}50%{filter:drop-shadow(0 0 22px rgba(205,242,74,.95))}}
-  #loaderPath{stroke-dasharray:200 210;stroke-dashoffset:0;animation:dashRun 2.2s linear infinite}
+  #loaderPath,.lo-path{stroke-dasharray:200 210;stroke-dashoffset:0;animation:dashRun 2.2s linear infinite}
   @keyframes dashRun{to{stroke-dashoffset:-410}}
   .lo-orbit{position:absolute;inset:-4px;animation:orbitSpin 2.8s linear infinite}
   @keyframes orbitSpin{to{transform:rotate(360deg)}}
@@ -361,7 +361,7 @@
   .lo-label{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:var(--text-3);animation:lblBlink 1.4s steps(1) infinite}
   @keyframes lblBlink{50%{opacity:.28}}
 
-  @media (prefers-reduced-motion: reduce){ #loaderCube,#loaderPath,.lo-orbit,.lo-label{animation:none!important} }
+  @media (prefers-reduced-motion: reduce){ #loaderCube,.lo-cube,#loaderPath,.lo-path,.lo-orbit,.lo-label{animation:none!important} }
 </style>
 </head>
 <body>
@@ -550,6 +550,20 @@
   <div class="sv-stage">
     <div class="stage-depth"><div class="stage-floor"></div><div class="stage-glow"></div></div>
     <div class="fx-lines"></div>
+    <div id="loaderOverlayS">
+      <div class="lo-wrap">
+        <svg id="loaderCubeS" class="lo-cube" viewBox="0 0 100 100" width="90" height="90" fill="none" aria-hidden="true">
+          <path stroke="rgba(205,242,74,.13)" stroke-width="9" stroke-linecap="round"
+            d="M50 8 L87.5 29 L87.5 71 L50 92 L12.5 71 L12.5 29 Z M12.5 29 L50 50 L87.5 29 M50 50 L50 92"/>
+          <path class="lo-path" stroke="#cdf24a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            d="M50 8 L87.5 29 L87.5 71 L50 92 L12.5 71 L12.5 29 Z M12.5 29 L50 50 L87.5 29 M50 50 L50 92"/>
+        </svg>
+        <div class="lo-orbit"><div class="lo-dot"></div></div>
+      </div>
+      <div class="lo-pct" id="loaderPctS">0%</div>
+      <div class="lo-bar"><div class="lo-fill" id="loaderFillS"></div></div>
+      <div class="lo-label">SCANNING ASSET</div>
+    </div>
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
@@ -1088,10 +1102,28 @@ function showShared(url,name,iosUrl){
   document.getElementById('sharedView').style.display='flex';
   document.getElementById('sharedName').textContent=name||'3D model';
   const v=document.getElementById('sharedViewer'), empty=document.getElementById('sharedEmpty');
-  if(url){ v.style.display=''; empty.style.display='none'; v.setAttribute('src',url); }
-  else { v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex'; }
+  if(url){
+    v.style.display=''; empty.style.display='none';
+    showLoaderS();
+    v.setAttribute('src',url);
+  } else {
+    v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
+  }
   if(iosUrl) v.setAttribute('ios-src',iosUrl); else v.removeAttribute('ios-src');
 }
+
+// wire progress + load + error for shared viewer
+(()=>{
+  const v=document.getElementById('sharedViewer');
+  v.addEventListener('load', hideLoaderS);
+  v.addEventListener('error', hideLoaderS);
+  v.addEventListener('progress', e=>{
+    const p=Math.round((e.detail.totalProgress||0)*100);
+    const pct=document.getElementById('loaderPctS'), fill=document.getElementById('loaderFillS');
+    if(pct) pct.textContent=p+'%';
+    if(fill) fill.style.width=p+'%';
+  });
+})();
 function goWorkspace(){ location.href=location.origin+location.pathname; }
 
 /* ===================== UTILS ===================== */
@@ -1274,6 +1306,8 @@ function makeStageDots(){
 }
 function showLoader(){ const el=document.getElementById('loaderOverlay'); if(!el) return; el.querySelector('#loaderPct').textContent='0%'; el.querySelector('#loaderFill').style.width='0'; el.classList.add('show'); }
 function hideLoader(){ const el=document.getElementById('loaderOverlay'); if(el) el.classList.remove('show'); }
+function showLoaderS(){ const el=document.getElementById('loaderOverlayS'); if(!el) return; document.getElementById('loaderPctS').textContent='0%'; document.getElementById('loaderFillS').style.width='0'; el.classList.add('show'); }
+function hideLoaderS(){ const el=document.getElementById('loaderOverlayS'); if(el) el.classList.remove('show'); }
 function makeParticles(){
   if(REDUCE_MOTION) return;
   const box=document.getElementById('fxParticles'); if(!box || box.childElementCount) return;
