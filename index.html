@@ -741,7 +741,7 @@ async function showSplat(url, rootId, ext){
     hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters();
     document.getElementById('nowDim') && (document.getElementById('nowDim').textContent='loaded ✓');
     // grab a thumbnail of the splat for the repo list + share card
-    if(rootId==='splatStage' && activeId){ const aid=activeId; setTimeout(()=>{ const d=captureSplatStage(); if(d){ posterCache[aid]=d; savePoster(aid,d); const w=document.getElementById('thwrap-'+aid); if(w) w.innerHTML=`<img class="thumb-img" src="${d}" alt="" loading="lazy" decoding="async">`; persistPoster(aid,d); } }, 900); }
+    if(rootId==='splatStage' && activeId){ const aid=activeId; setTimeout(async()=>{ let d=captureSplatStage(); if(d){ d=await trimPoster(d); posterCache[aid]=d; savePoster(aid,d); const w=document.getElementById('thwrap-'+aid); if(w) w.innerHTML=`<img class="thumb-img" src="${d}" alt="" loading="lazy" decoding="async">`; persistPoster(aid,d); } }, 900); }
   }catch(e){
     hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters(); toast('Could not load this splat'); destroySplat();
   }
@@ -862,7 +862,7 @@ function renderRepo(){
   const cube='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>';
   const splat='<svg viewBox="0 0 24 24" fill="currentColor" opacity=".9"><circle cx="7" cy="8" r="2.1"/><circle cx="14" cy="6" r="1.5"/><circle cx="17" cy="11" r="2.3"/><circle cx="9" cy="14" r="1.7"/><circle cx="13" cy="17" r="2"/><circle cx="5" cy="15" r="1.3"/></svg>';
   list.innerHTML=assets.map(a=>{
-    const poster = a.poster || posterCache[a.id];
+    const poster = posterCache[a.id] || a.poster;
     const inner = (a.src && isPly(a.src)) ? splat : ((a.src && poster) ? `<img class="thumb-img" src="${poster}" alt="" loading="lazy" decoding="async">` : cube);
     return `
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
@@ -879,6 +879,24 @@ function renderRepo(){
     </div>`;
   }).join('');
   observePosters();
+  retrimThumbs();
+}
+// trim already-stored posters (from before auto-trim existed) once, so old thumbnails become tight too
+const trimmedIds=new Set();
+function retrimThumbs(){
+  for(const a of assets){
+    if(trimmedIds.has(a.id)) continue;
+    if(!(a.src && !isPly(a.src))) continue;          // model posters only
+    const src = posterCache[a.id] || a.poster;
+    if(!src) continue;
+    trimmedIds.add(a.id);
+    trimPoster(src).then(t=>{
+      if(!t || t===src) return;
+      posterCache[a.id]=t; savePoster(a.id,t);
+      const w=document.getElementById('thwrap-'+a.id);
+      if(w){ const im=w.querySelector('img'); if(im) im.src=t; else w.innerHTML=`<img class="thumb-img" src="${t}" alt="" loading="lazy" decoding="async">`; }
+    });
+  }
 }
 
 /* ---- lightweight repo thumbnails: render a poster once, one viewer at a time ---- */
@@ -889,6 +907,32 @@ let stageBusy=false;   // true while the main viewport is loading a model — pa
 function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0 && dataUrl.length<500000) localStorage.setItem('creartor_poster_'+id, dataUrl); }catch(e){} }
 function hydratePosters(){ try{ for(const a of assets){ if(!posterCache[a.id]){ const v=localStorage.getItem('creartor_poster_'+a.id); if(v) posterCache[a.id]=v; } } }catch(e){} }
 function dropPoster(id){ try{ localStorage.removeItem('creartor_poster_'+id); }catch(e){} }
+// crop the empty/transparent margins around the model so thumbnails are tight & big (returns a square dataURL)
+function trimPoster(dataUrl){
+  return new Promise(resolve=>{
+    if(!dataUrl){ resolve(dataUrl); return; }
+    const img=new Image(); img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{
+        const w=img.naturalWidth, h=img.naturalHeight; if(!w||!h){ resolve(dataUrl); return; }
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx=c.getContext('2d'); ctx.drawImage(img,0,0);
+        const d=ctx.getImageData(0,0,w,h).data;
+        let minX=w,minY=h,maxX=-1,maxY=-1; const thr=12;
+        for(let y=0;y<h;y++){ const row=y*w; for(let x=0;x<w;x++){ if(d[(row+x)*4+3]>thr){ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; } } }
+        if(maxX<0){ resolve(dataUrl); return; }          // fully transparent -> keep original
+        const bw=maxX-minX+1, bh=maxY-minY+1;
+        const pad=Math.round(Math.max(bw,bh)*0.07);
+        const side=Math.max(bw,bh)+pad*2;
+        const out=document.createElement('canvas'); out.width=side; out.height=side;
+        out.getContext('2d').drawImage(c, minX, minY, bw, bh, (side-bw)/2, (side-bh)/2, bw, bh);
+        resolve(out.toDataURL('image/webp',0.85));
+      }catch(e){ resolve(dataUrl); }
+    };
+    img.onerror=()=>resolve(dataUrl);
+    img.src=dataUrl;
+  });
+}
 function observePosters(){
   const need=a=>a.src && !isPly(a.src) && !(a.poster||posterCache[a.id]);
   if(!('IntersectionObserver' in window)){ assets.forEach(a=>{ if(need(a)) queuePoster(a.id,a.src); }); return; }
@@ -912,8 +956,9 @@ async function drainPosters(){
   // give the main viewport priority — don't decode a background model while the stage is loading or a card is open
   if(stageBusy || document.getElementById('shareModal')?.classList.contains('show')){ setTimeout(drainPosters,600); return; }
   const job=posterQ.shift(); if(!job) return; posterBusy=true;
-  const url=await captureThumb(job.src);
+  let url=await captureThumb(job.src);
   if(url){
+    url=await trimPoster(url);
     posterCache[job.id]=url; savePoster(job.id,url);
     const w=document.getElementById('thwrap-'+job.id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
     persistPoster(job.id, url);   // also upload (best-effort) for cross-device persistence
@@ -942,8 +987,9 @@ function capturePosterFromStage(id){
     if(done) return; done=true; v.removeEventListener('load',grab);
     await new Promise(r=>setTimeout(r,180));
     try{
-      const url=v.toDataURL ? v.toDataURL('image/webp',0.85) : null;
+      let url=v.toDataURL ? v.toDataURL('image/webp',0.85) : null;
       if(url && url.length>200){
+        url=await trimPoster(url);
         posterCache[id]=url; savePoster(id,url);
         const w=document.getElementById('thwrap-'+id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
         persistPoster(id,url);
