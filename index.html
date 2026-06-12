@@ -872,7 +872,7 @@ function renderRepo(){
         <div class="sub">${a.src?a.fmt:'USDZ'} · ${a.size}</div>
       </div>
       <div class="acts">
-        ${a.src?`<button class="iconbtn" title="Regenerate thumbnail (face front)" onclick="regenPoster(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.5 8a9 9 0 1 0 2-3.3L3 8"/></svg></button>`:''}
+        ${a.src?`<button class="iconbtn" title="Set thumbnail from current stage view" onclick="regenPoster(event,'${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.5 8a9 9 0 1 0 2-3.3L3 8"/></svg></button>`:''}
         <button class="iconbtn" title="Share" onclick="event.stopPropagation();openShare('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
         <button class="iconbtn del" title="Delete" onclick="event.stopPropagation();delAsset('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
       </div>
@@ -941,15 +941,22 @@ function observePosters(){
   document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !isPly(w.dataset.src) && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
 }
 function queuePoster(id,src){ if(!src||isPly(src)||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
-// force re-render one thumbnail at the current (front) angle, overwriting the stored poster
-function regenPoster(e,id){
+// regenerate the thumbnail from EXACTLY what's shown on the stage right now (current angle/zoom)
+async function regenPoster(e,id){
   if(e) e.stopPropagation();
   const a=assets.find(x=>x.id===id); if(!a||!a.src) return;
-  a.poster=null; delete posterCache[id]; dropPoster(id);
-  const w=document.getElementById('thwrap-'+id);
-  if(w) w.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>';
-  toast('Regenerating thumbnail…');
-  queuePoster(id, a.src);
+  if(id!==activeId){ toast('Open this asset on the stage first, then tap ↻'); loadAsset(id); return; }
+  let url=null;
+  try{
+    if(isPly(a.src)){ url=captureSplatStage(); }
+    else { const v=document.getElementById('stageViewer'); url = (v&&v.toDataURL) ? v.toDataURL('image/webp',0.9) : null; }
+  }catch(_){ url=null; }
+  if(!url || url.length<200){ toast('Could not capture the stage — try again'); return; }
+  url=await trimPoster(url);
+  a.poster=null; posterCache[id]=url; savePoster(id,url); trimmedIds.add(id);
+  const w=document.getElementById('thwrap-'+id); if(w) w.innerHTML=`<img class="thumb-img" src="${url}" alt="" loading="lazy" decoding="async">`;
+  persistPoster(id,url);
+  toast('Thumbnail set from stage view');
 }
 async function drainPosters(){
   if(posterBusy) return;
