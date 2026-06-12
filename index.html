@@ -180,7 +180,7 @@
 
   .repo-list{display:flex;flex-direction:column;gap:10px;max-height:520px;overflow-y:auto;padding-right:4px}
   .repo-list::-webkit-scrollbar{width:6px}.repo-list::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px}
-  .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 92px}
+  .asset{display:flex;gap:13px;align-items:center;padding:11px;border-radius:13px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);transition:.2s var(--ease);position:relative;overflow:hidden}
   .asset:hover{border-color:var(--line-strong);transform:translateX(2px)}
   .asset.active{border-color:rgba(205,242,74,.5);background:rgba(205,242,74,.05)}
   .asset.active::before{content:"";position:absolute;left:0;top:14%;bottom:14%;width:3px;border-radius:3px;background:var(--signal)}
@@ -207,9 +207,11 @@
   .ac-btn .i-pause{display:none}
   .ac-btn.playing .i-play{display:none}
   .ac-btn.playing .i-pause{display:block}
-  .asset .meta{flex:1;min-width:0}
-  .asset .meta .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
-  .asset .meta .sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-3);margin-top:3px}
+  .asset .meta{flex:1;min-width:0;overflow:hidden}
+  .asset .meta .nm{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;min-width:0}
+  .asset .meta .nm > span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .asset .meta .nm .badge-ios{flex:0 0 auto}
+  .asset .meta .sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .badge-ios{font-family:"Space Mono",monospace;font-size:9px;letter-spacing:.06em;padding:2px 6px;border-radius:5px;background:rgba(205,242,74,.12);color:var(--signal);border:1px solid rgba(205,242,74,.3);margin-left:7px;flex-shrink:0}
   .asset .acts{display:flex;gap:4px;opacity:0;transition:.2s}
   .asset:hover .acts,.asset.active .acts{opacity:1}
@@ -556,7 +558,8 @@
             </div>
           </div>
 
-          <input type="file" id="glbInput" accept=".glb,.gltf,.ply" hidden />
+          <input type="file" id="glbInput" hidden />
+          <!-- no accept filter: iOS greys out .glb/.ply when accept lists unknown extensions, so we validate in JS instead -->
           <input type="file" id="usdzInput" accept=".usdz" hidden />
 
           <div class="preview-wrap" id="previewWrap" style="display:none">
@@ -709,7 +712,10 @@ async function showSplat(url, rootId){
       halfPrecisionCovariancesOnGPU: true
     });
     splatViewer=v;
-    await v.addSplatScene(url, { format: GS.SceneFormat.Ply, progressiveLoad:true, showLoadingUI:false });
+    const fmt = /\.ksplat(\?|$)/i.test(url) ? GS.SceneFormat.KSplat
+              : /\.splat(\?|$)/i.test(url)  ? GS.SceneFormat.Splat
+              : GS.SceneFormat.Ply;
+    await v.addSplatScene(url, { format: fmt, progressiveLoad:true, showLoadingUI:false });
     if(mytok!==splatToken){ try{ v.dispose(); }catch(e){} return; }
     v.start();
     hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters();
@@ -993,11 +999,11 @@ function setupDz(zone, input, kind){
 function pick(kind, file){
   if(!file) return;
   if(kind==='glb'){
-    if(!/\.(glb|gltf|ply)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf or .ply'); return; }
+    if(!/\.(glb|gltf|ply|splat|ksplat)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf, .ply, .splat or .ksplat'); return; }
     pendingGlb=file; dzGlb.classList.add('has');
     document.getElementById('glbText').textContent=file.name;
     document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
-    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply)$/i,'');
+    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply|splat|ksplat)$/i,'');
     if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
     previewGlbUrl=URL.createObjectURL(file);
     showPreview();
@@ -1018,7 +1024,7 @@ function showPreview(){
   if(!previewGlbUrl) return;
   previewing=true;
   const nm=previewName();
-  const ply = pendingGlb && /\.ply$/i.test(pendingGlb.name);
+  const ply = pendingGlb && /\.(ply|splat|ksplat)$/i.test(pendingGlb.name);
   const fmt = ply ? 'PLY' : (pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB');
   // small preview thumbnail in the panel (model-viewer can't show splats — skip it for .ply)
   const wrap=document.getElementById('previewWrap'), pmv=document.getElementById('previewMV');
