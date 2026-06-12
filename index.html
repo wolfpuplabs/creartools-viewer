@@ -33,6 +33,20 @@
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Gaussian Splat (.ply) viewer — loaded lazily; only used for splat assets -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.6/build/gaussian-splats-3d.module.js"
+}}
+</script>
+<script type="module">
+  // expose the splat library to the classic app script once it loads
+  window.__GS_READY = (async () => {
+    try{ const GS = await import('@mkkellogg/gaussian-splats-3d'); window.__GS = GS; return GS; }
+    catch(e){ console.warn('Splat lib failed to load', e); window.__GS = null; return null; }
+  })();
+</script>
 
 <style>
   :root{
@@ -383,6 +397,9 @@
 
   @media (prefers-reduced-motion: reduce){ #loaderCube,.lo-cube,#loaderPath,.lo-path,.lo-orbit,.lo-label{animation:none!important} }
   .thumb-img{width:100%;height:100%;object-fit:contain;display:block;border-radius:inherit;padding:3px}
+  #splatStage,#splatStageS{position:absolute;inset:0;display:none;background:transparent;z-index:1}
+  #splatStage.show,#splatStageS.show{display:block}
+  #splatStage canvas,#splatStageS canvas{width:100%!important;height:100%!important;display:block;border-radius:20px}
 
   /* low-FX mode (iOS / small screens / reduced-motion): drop the GPU-heavy effects */
   body.lowfx .bg-nebula{display:none}
@@ -479,6 +496,7 @@
           <div class="lo-label">SCANNING ASSET</div>
         </div>
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" disable-pan autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+        <div id="splatStage"></div>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
           <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
@@ -527,8 +545,8 @@
             <div class="dropzone" id="dzGlb">
               <span class="dz-tag">Required</span>
               <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
-              <p id="glbText">GLB / GLTF model</p>
-              <small id="glbSub">3D viewer + Android AR</small>
+              <p id="glbText">GLB / GLTF / PLY</p>
+              <small id="glbSub">3D + Android AR · or .ply splat</small>
             </div>
             <div class="dropzone opt" id="dzUsdz">
               <span class="dz-tag">Optional</span>
@@ -538,7 +556,7 @@
             </div>
           </div>
 
-          <input type="file" id="glbInput" accept=".glb,.gltf" hidden />
+          <input type="file" id="glbInput" accept=".glb,.gltf,.ply" hidden />
           <input type="file" id="usdzInput" accept=".usdz" hidden />
 
           <div class="preview-wrap" id="previewWrap" style="display:none">
@@ -594,6 +612,7 @@
       <div class="lo-label">SCANNING ASSET</div>
     </div>
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" disable-pan auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
+    <div id="splatStageS"></div>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
       <p>AR-only model</p>
@@ -663,6 +682,42 @@ let previewGlbUrl=null, previewUsdzUrl=null, previewing=false;
 let qrName='', qrLink='';
 
 const isUsdz = u => /\.usdz(\?|$)/i.test(u||'');
+const isPly  = u => /\.(ply|splat|ksplat)(\?|$)/i.test(u||'');
+
+/* ===================== GAUSSIAN SPLAT (.ply) VIEWER ===================== */
+let splatViewer=null, splatToken=0, splatRootId='splatStage';
+function destroySplat(){
+  const cur=splatViewer; splatViewer=null;
+  if(cur){ try{ cur.dispose && cur.dispose(); }catch(e){} }
+  ['splatStage','splatStageS'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.classList.remove('show'); el.innerHTML=''; } });
+}
+async function showSplat(url, rootId){
+  rootId=rootId||'splatStage'; splatRootId=rootId;
+  const mytok=++splatToken;
+  const el=document.getElementById(rootId); if(!el) return;
+  destroySplat();
+  el.classList.add('show');
+  const GS = window.__GS || (window.__GS_READY ? await window.__GS_READY : null);
+  if(mytok!==splatToken) return;                 // superseded while the lib loaded
+  if(!GS){ hideLoader(); hideLoaderS(); toast('Splat viewer unavailable (offline?)'); el.classList.remove('show'); return; }
+  try{
+    const v=new GS.Viewer({
+      rootElement: el,
+      sharedMemoryForWorkers: false,   // Vercel has no COOP/COEP, so no SharedArrayBuffer
+      useBuiltInControls: true,
+      gpuAcceleratedSort: false,
+      halfPrecisionCovariancesOnGPU: true
+    });
+    splatViewer=v;
+    await v.addSplatScene(url, { format: GS.SceneFormat.Ply, progressiveLoad:true, showLoadingUI:false });
+    if(mytok!==splatToken){ try{ v.dispose(); }catch(e){} return; }
+    v.start();
+    hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters();
+    document.getElementById('nowDim') && (document.getElementById('nowDim').textContent='loaded ✓');
+  }catch(e){
+    hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters(); toast('Could not load this splat'); destroySplat();
+  }
+}
 
 /* ===================== INIT ===================== */
 window.addEventListener('DOMContentLoaded', init);
@@ -768,9 +823,10 @@ function renderRepo(){
   document.getElementById('mTotal').textContent=assets.length;
   if(!assets.length){ list.innerHTML='<div class="empty"><div class="mono">— EMPTY REPOSITORY —</div><p style="margin-top:8px;font-size:13px">Deploy your first 3D model to save it to the cloud.</p></div>'; return; }
   const cube='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>';
+  const splat='<svg viewBox="0 0 24 24" fill="currentColor" opacity=".9"><circle cx="7" cy="8" r="2.1"/><circle cx="14" cy="6" r="1.5"/><circle cx="17" cy="11" r="2.3"/><circle cx="9" cy="14" r="1.7"/><circle cx="13" cy="17" r="2"/><circle cx="5" cy="15" r="1.3"/></svg>';
   list.innerHTML=assets.map(a=>{
     const poster = a.poster || posterCache[a.id];
-    const inner = (a.src && poster) ? `<img class="thumb-img" src="${poster}" alt="" loading="lazy" decoding="async">` : cube;
+    const inner = (a.src && isPly(a.src)) ? splat : ((a.src && poster) ? `<img class="thumb-img" src="${poster}" alt="" loading="lazy" decoding="async">` : cube);
     return `
     <div class="asset ${a.id===activeId?'active':''}" onclick="loadAsset('${a.id}')">
       <div class="thumb" id="thwrap-${a.id}" data-id="${a.id}" data-src="${a.src||''}">${inner}</div>
@@ -797,13 +853,13 @@ function savePoster(id,dataUrl){ try{ if(dataUrl && dataUrl.indexOf('data:')===0
 function hydratePosters(){ try{ for(const a of assets){ if(!posterCache[a.id]){ const v=localStorage.getItem('creartor_poster_'+a.id); if(v) posterCache[a.id]=v; } } }catch(e){} }
 function dropPoster(id){ try{ localStorage.removeItem('creartor_poster_'+id); }catch(e){} }
 function observePosters(){
-  const need=a=>a.src && !(a.poster||posterCache[a.id]);
+  const need=a=>a.src && !isPly(a.src) && !(a.poster||posterCache[a.id]);
   if(!('IntersectionObserver' in window)){ assets.forEach(a=>{ if(need(a)) queuePoster(a.id,a.src); }); return; }
   if(posterIO) posterIO.disconnect();
   posterIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ posterIO.unobserve(en.target); queuePoster(en.target.dataset.id, en.target.dataset.src); } }); },{root:document.getElementById('repoList'),rootMargin:'150px'});
-  document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
+  document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !isPly(w.dataset.src) && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
 }
-function queuePoster(id,src){ if(!src||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
+function queuePoster(id,src){ if(!src||isPly(src)||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
 // force re-render one thumbnail at the current (front) angle, overwriting the stored poster
 function regenPoster(e,id){
   if(e) e.stopPropagation();
@@ -874,25 +930,38 @@ function loadAsset(id){
   activeId=id;
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
   if(a.src){
+    const ply=isPly(a.src);
+    if(!ply) destroySplat();                       // leaving a splat -> tear it down
     stageBusy=true;
     try{ document.getElementById('posterMV').removeAttribute('src'); }catch(e){} // free the background renderer so the stage loads first
-    v.style.display=''; empty.style.display='none'; showLoader();
-    v.setAttribute('src',a.src);
+    v.style.display=ply?'none':''; empty.style.display='none'; showLoader();
     document.getElementById('nowDim').textContent='loading…';
-    v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
-    clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000); // never leave the loader stuck
+    if(ply){
+      v.removeAttribute('src');
+      showSplat(a.src);                             // clears stageBusy + hides loader when done
+      clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000);
+    }else{
+      v.setAttribute('src',a.src);
+      v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
+      clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000); // never leave the loader stuck
+    }
   }else{
+    destroySplat();
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
     document.getElementById('nowDim').textContent='AR-only';
     document.getElementById('animBtn').classList.add('hidden');
   }
   if(a.iosSrc) v.setAttribute('ios-src',a.iosSrc); else v.removeAttribute('ios-src');
-  const fmtLabel = a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ';
+  const ply=a.src&&isPly(a.src);
+  const fmtLabel = ply ? 'PLY · SPLAT' : (a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ');
   setStageName(a.name);
   document.getElementById('nowFmt').textContent=fmtLabel;
   document.getElementById('mFormat').textContent=fmtLabel;
   document.getElementById('mSize').textContent=a.size;
-  document.getElementById('mAr').textContent = a.src&&a.iosSrc ? 'iOS + Android' : (a.iosSrc?'iOS only':'Android/WebXR');
+  document.getElementById('mAr').textContent = ply ? 'Web only' : (a.src&&a.iosSrc ? 'iOS + Android' : (a.iosSrc?'iOS only':'Android/WebXR'));
+  // splats can't use Quick Look / Scene Viewer — hide AR + animation tools for them
+  const arBtn=document.querySelector('.tool.ar'); if(arBtn) arBtn.style.display = ply ? 'none' : '';
+  if(ply){ ['animBtn','loopBtn','animResetBtn'].forEach(i=>document.getElementById(i)?.classList.add('hidden')); }
   renderRepo();
 }
 async function delAsset(id){
@@ -924,11 +993,11 @@ function setupDz(zone, input, kind){
 function pick(kind, file){
   if(!file) return;
   if(kind==='glb'){
-    if(!/\.(glb|gltf)$/i.test(file.name)){ toast('GLB slot accepts .glb or .gltf only'); return; }
+    if(!/\.(glb|gltf|ply)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf or .ply'); return; }
     pendingGlb=file; dzGlb.classList.add('has');
     document.getElementById('glbText').textContent=file.name;
     document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
-    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf)$/i,'');
+    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply)$/i,'');
     if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
     previewGlbUrl=URL.createObjectURL(file);
     showPreview();
@@ -949,18 +1018,17 @@ function showPreview(){
   if(!previewGlbUrl) return;
   previewing=true;
   const nm=previewName();
-  const fmt=pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB';
-  // small preview thumbnail in the panel
+  const ply = pendingGlb && /\.ply$/i.test(pendingGlb.name);
+  const fmt = ply ? 'PLY' : (pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB');
+  // small preview thumbnail in the panel (model-viewer can't show splats — skip it for .ply)
   const wrap=document.getElementById('previewWrap'), pmv=document.getElementById('previewMV');
-  pmv.setAttribute('src',previewGlbUrl);
+  if(ply){ pmv.removeAttribute('src'); } else { pmv.setAttribute('src',previewGlbUrl); }
   document.getElementById('previewName').textContent=nm;
-  document.getElementById('previewSub').textContent=(pendingUsdz?'GLB + USDZ':fmt)+' · live preview, not saved';
+  document.getElementById('previewSub').textContent=(ply?'PLY splat':(pendingUsdz?'GLB + USDZ':fmt))+' · live preview, not saved';
   wrap.style.display='flex';
-  // load into the main AR viewer / stage
+  // load into the main stage
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
-  v.style.display=''; empty.style.display='none'; showLoader();
-  if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
-  v.setAttribute('src',previewGlbUrl);
+  empty.style.display='none'; showLoader();
   activeId=null; renderRepo();
   setStageName(nm);
   document.getElementById('nowFmt').textContent='PREVIEW';
@@ -968,7 +1036,16 @@ function showPreview(){
   document.getElementById('mFormat').textContent=fmt;
   document.getElementById('mSize').textContent=pendingGlb?(pendingGlb.size/1048576).toFixed(1)+' MB':'—';
   document.getElementById('mAr').textContent='Preview';
-  v.addEventListener('load',()=>{ if(previewing) document.getElementById('nowDim').textContent='preview ✓'; },{once:true});
+  if(ply){
+    v.style.display='none'; v.removeAttribute('src');
+    showSplat(previewGlbUrl);
+  }else{
+    destroySplat();
+    v.style.display='';
+    if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
+    v.setAttribute('src',previewGlbUrl);
+    v.addEventListener('load',()=>{ if(previewing) document.getElementById('nowDim').textContent='preview ✓'; },{once:true});
+  }
 }
 function discardPreview(){
   if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
@@ -1005,7 +1082,7 @@ async function deploy(){
     assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null});
     renderRepo(); loadAsset(r.id);
     resetUpload();
-    capturePosterFromStage(r.id);  // grab the poster from the stage once it loads — no extra decode, doesn't block deploy
+    if(!isPly(url)) capturePosterFromStage(r.id);  // splats can't be captured by model-viewer; skip
     toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
@@ -1013,7 +1090,7 @@ async function deploy(){
 function resetUpload(){
   pendingGlb=null; pendingUsdz=null;
   dzGlb.classList.remove('has'); dzUsdz.classList.remove('has');
-  document.getElementById('glbText').textContent='GLB / GLTF model';
+  document.getElementById('glbText').textContent='GLB / GLTF / PLY';
   document.getElementById('glbSub').textContent='3D viewer + Android AR';
   document.getElementById('usdzText').textContent='USDZ model';
   document.getElementById('usdzSub').textContent='native iPhone / iPad AR';
@@ -1068,6 +1145,8 @@ function resetCam(){
 }
 function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
 function launchAR(){
+  const a=assets.find(x=>x.id===activeId);
+  if(a && isPly(a.src)){ toast('Splats are web-only — AR isn’t available for .ply'); return; }
   const v=document.getElementById('stageViewer');
   speedLines(document.querySelector('.stage')); sfxAR();
   setTimeout(()=>{ if(v.canActivateAR) v.activateAR(); else toast('Open on a mobile device to view in AR'); }, 240);
@@ -1187,13 +1266,14 @@ async function buildShareCard(a, token, meta){
   composeTradingCard({assetImg:null, qrNode, ...meta}); // redraw once webfonts are ready
   // fetch the best available render (each step capped so it can't hang), then redraw
   let img=null;
-  if(a.id===activeId)            img = await withTimeout(captureStage(), 2500);
+  const ply=isPly(a.src);
+  if(!ply && a.id===activeId)            img = await withTimeout(captureStage(), 2500);
   if(!live()) return;
   if(!img && posterCache[a.id])  img = await withTimeout(urlToImg(posterCache[a.id]), 2500);
   if(!live()) return;
   if(!img && a.poster)           img = await withTimeout(urlToImg(a.poster), 3000);
   if(!live()) return;
-  if(!img && a.src)              img = await withTimeout(captureAsset(a.src), 5000);
+  if(!ply && !img && a.src)      img = await withTimeout(captureAsset(a.src), 5000);
   if(!live()) return;
   if(img) composeTradingCard({assetImg:img, qrNode, ...meta});
 }
@@ -1313,6 +1393,13 @@ function showShared(url,name,iosUrl){
   document.getElementById('sharedView').style.display='flex';
   document.getElementById('sharedName').textContent=name||'3D model';
   const v=document.getElementById('sharedViewer'), empty=document.getElementById('sharedEmpty');
+  if(url && isPly(url)){
+    v.removeAttribute('src'); v.style.display='none'; empty.style.display='none';
+    showLoaderS(); showSplat(url,'splatStageS');
+    const arb=document.querySelector('#sharedView .tool.ar, #sharedView .sv-ar'); if(arb) arb.style.display='none';
+    return;
+  }
+  destroySplat();
   if(url){
     v.style.display=''; empty.style.display='none';
     showLoaderS();
