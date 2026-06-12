@@ -694,7 +694,7 @@ function destroySplat(){
   if(cur){ try{ cur.dispose && cur.dispose(); }catch(e){} }
   ['splatStage','splatStageS'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.classList.remove('show'); el.innerHTML=''; } });
 }
-async function showSplat(url, rootId){
+async function showSplat(url, rootId, ext){
   rootId=rootId||'splatStage'; splatRootId=rootId;
   const mytok=++splatToken;
   const el=document.getElementById(rootId); if(!el) return;
@@ -709,12 +709,15 @@ async function showSplat(url, rootId){
       sharedMemoryForWorkers: false,   // Vercel has no COOP/COEP, so no SharedArrayBuffer
       useBuiltInControls: true,
       gpuAcceleratedSort: false,
-      halfPrecisionCovariancesOnGPU: true
+      halfPrecisionCovariancesOnGPU: true,
+      cameraUp: [0,-1,0],              // gaussian splats are usually Y-down -> flip so they're upright
+      initialCameraPosition: [0,0,-4],
+      initialCameraLookAt: [0,0,0]
     });
     splatViewer=v;
-    const fmt = /\.ksplat(\?|$)/i.test(url) ? GS.SceneFormat.KSplat
-              : /\.splat(\?|$)/i.test(url)  ? GS.SceneFormat.Splat
-              : GS.SceneFormat.Ply;
+    // detect format from the explicit extension hint (preview uses a blob: URL with no extension), else from the URL
+    const e = (ext || (url.match(/\.(ply|splat|ksplat)(\?|$)/i)?.[1]) || 'ply').toLowerCase();
+    const fmt = e==='ksplat' ? GS.SceneFormat.KSplat : e==='splat' ? GS.SceneFormat.Splat : GS.SceneFormat.Ply;
     await v.addSplatScene(url, { format: fmt, progressiveLoad:true, showLoadingUI:false });
     if(mytok!==splatToken){ try{ v.dispose(); }catch(e){} return; }
     v.start();
@@ -1044,7 +1047,7 @@ function showPreview(){
   document.getElementById('mAr').textContent='Preview';
   if(ply){
     v.style.display='none'; v.removeAttribute('src');
-    showSplat(previewGlbUrl);
+    showSplat(previewGlbUrl, 'splatStage', pendingGlb.name.split('.').pop());
   }else{
     destroySplat();
     v.style.display='';
