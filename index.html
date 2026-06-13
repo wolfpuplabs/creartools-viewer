@@ -594,15 +594,15 @@
             </button>
           </div>
 
-          <button class="btn btn-primary btn-block" id="deployBtn" style="margin-top:14px;opacity:.5;pointer-events:none" onclick="deploy()">
-            <span class="spin"></span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
-            <span class="lbl">Deploy &amp; save to share</span>
-          </button>
-          <button class="btn btn-ghost btn-block" id="tempShareBtn" style="margin-top:9px;display:none" onclick="tempShare()">
+          <button class="btn btn-ghost btn-block" id="tempShareBtn" style="margin-top:14px;display:none" onclick="tempShare()">
             <span class="spin"></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
             <span class="lbl">Share now · expires in 24h</span>
+          </button>
+          <button class="btn btn-primary btn-block" id="deployBtn" style="margin-top:9px;opacity:.5;pointer-events:none" onclick="deploy()">
+            <span class="spin"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
+            <span class="lbl">Deploy &amp; save to library</span>
           </button>
         </div>
       </div>
@@ -1326,8 +1326,15 @@ async function tempShare(){
     }
     const ply=isPly(pendingGlb.name);
     const name=document.getElementById('assetName').value.trim()||pendingGlb.name.replace(/\.(glb|gltf|ply|splat|ksplat)$/i,'');
+    // snapshot the model that's already shown on the stage so the card has a real thumbnail
+    let poster=null;
+    try{
+      if(ply){ poster=captureSplatStage(); }
+      else { const sv=document.getElementById('stageViewer'); poster = (sv&&sv.toDataURL)? sv.toDataURL('image/webp',0.92):null; }
+      if(poster) poster=await trimPoster(poster);
+    }catch(_){}
     const a={ name, src:url, iosSrc, fmt:ply?'PLY':pendingGlb.name.split('.').pop().toUpperCase(),
-              size:(pendingGlb.size/1048576).toFixed(1)+' MB',
+              size:(pendingGlb.size/1048576).toFixed(1)+' MB', poster,
               allowDl:document.getElementById('allowDl').checked,
               link:(document.getElementById('linkUrl').value||'').trim(),
               exp:Date.now()+24*60*60*1000 };
