@@ -245,6 +245,13 @@
   .preview-info .pv-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .preview-info .pv-sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.04em;color:var(--signal);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .preview-wrap > .iconbtn.del{position:absolute;top:10px;right:10px;z-index:4;background:rgba(8,8,10,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;width:34px;height:34px}
+  .opt-toggle{display:flex;align-items:center;gap:10px;margin-top:11px;cursor:pointer;user-select:none}
+  .opt-toggle input{position:absolute;opacity:0;width:0;height:0}
+  .opt-toggle .ot-box{width:40px;height:23px;border-radius:20px;background:var(--surface-3);border:1px solid var(--line);position:relative;flex:0 0 auto;transition:.2s var(--ease)}
+  .opt-toggle .ot-box::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--text-2);transition:.2s var(--ease)}
+  .opt-toggle input:checked + .ot-box{background:rgba(205,242,74,.35);border-color:rgba(205,242,74,.6)}
+  .opt-toggle input:checked + .ot-box::after{left:19px;background:var(--signal)}
+  .opt-toggle .ot-lbl{font-size:13px;color:var(--text-2)}
   .qr-card-wrap{display:flex;justify-content:center;position:relative}
   #qrCanvas{width:268px;max-width:82%;height:auto;border-radius:18px;box-shadow:0 24px 60px -24px rgba(0,0,0,.85)}
   #cardLoading{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-2);font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.2em}
@@ -567,6 +574,9 @@
             </div>
           </div>
 
+          <div class="field" style="margin-top:13px"><label>Web / store link <span style="color:var(--text-3);font-weight:400">· optional</span></label><input id="linkUrl" type="url" inputmode="url" placeholder="https://store.example.com/item" /></div>
+          <label class="opt-toggle"><input type="checkbox" id="allowDl"><span class="ot-box"></span><span class="ot-lbl">Allow viewers to download the file</span></label>
+
           <input type="file" id="glbInput" hidden />
           <!-- no accept filter: iOS greys out .glb/.ply when accept lists unknown extensions, so we validate in JS instead -->
           <input type="file" id="usdzInput" accept=".usdz" hidden />
@@ -588,6 +598,11 @@
             <span class="spin"></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14M5 9l7-7 7 7M5 22h14"/></svg>
             <span class="lbl">Deploy &amp; save to share</span>
+          </button>
+          <button class="btn btn-ghost btn-block" id="tempShareBtn" style="margin-top:9px;display:none" onclick="tempShare()">
+            <span class="spin"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+            <span class="lbl">Share now · expires in 24h</span>
           </button>
         </div>
       </div>
@@ -637,6 +652,8 @@
     </div>
     <div class="hud"><div></div><div class="toolbar">
       <button class="tool ar" onclick="launchSharedAR()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg>VIEW IN AR</button>
+      <button class="tool" id="svLink" style="display:none" onclick="openSharedLink()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>OPEN LINK</button>
+      <button class="tool" id="svDownload" style="display:none" onclick="downloadShared()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>DOWNLOAD</button>
     </div></div>
   </div>
 </div>
@@ -692,6 +709,7 @@ let sb=null, user=null, assets=[], activeId=null, authMode='login';
 let pendingGlb=null, pendingUsdz=null;
 let previewGlbUrl=null, previewUsdzUrl=null, previewing=false;
 let qrName='', qrLink='';
+let svModelUrl='', svIosUrl='', svLinkUrl='';
 
 const isUsdz = u => /\.usdz(\?|$)/i.test(u||'');
 const isPly  = u => /\.(ply|splat|ksplat)(\?|$)/i.test(u||'');
@@ -764,7 +782,12 @@ window.addEventListener('DOMContentLoaded', init);
 async function init(){
   const p=new URLSearchParams(location.search);
   const model=p.get('model'), ios=p.get('ios'), nm=p.get('name');
-  if(model||ios){ showShared(model, nm||'Shared model', ios); return; }
+  const exp=parseInt(p.get('exp')||'0',10);
+  if(model||ios){
+    if(exp && Date.now()>exp){ showExpired(); return; }
+    showShared(model, nm||'Shared model', ios, {dl:p.get('dl')==='1', link:p.get('link')||'', exp});
+    return;
+  }
 
   if(!window.supabase || !window.supabase.createClient){
     authNote('Supabase library blocked in this preview. Deploy this file to your host (GitHub Pages / Vercel) and it will connect.','err');
@@ -839,7 +862,7 @@ async function loadAssets(){
       let src=r.url||null, iosSrc=r.ios_src||null, path=r.path||null, iosPath=r.ios_path||null;
       // legacy safety: an old asset whose only file was a USDZ -> treat as AR-only
       if(!iosSrc && isUsdz(src)){ iosSrc=src; iosPath=path; src=null; path=null; }
-      return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath,poster:r.poster||null};
+      return {id:r.id,name:r.name,src,iosSrc,fmt:r.format,size:r.size,path,iosPath,poster:r.poster||null,link:r.link_url||null,allowDl:!!r.allow_download};
     });
   }catch(e){ toast('Could not load repository: '+e.message); assets=[]; }
   hydratePosters();   // instant thumbnails/cards from previously saved posters
@@ -1105,6 +1128,7 @@ function pick(kind, file){
   }
   const b=document.getElementById('deployBtn'), on=!!pendingGlb;
   b.style.opacity=on?'1':'.5'; b.style.pointerEvents=on?'auto':'none';
+  const tb=document.getElementById('tempShareBtn'); if(tb) tb.style.display=on?'':'none';
 }
 function previewName(){ return document.getElementById('assetName').value.trim() || (pendingGlb?pendingGlb.name.replace(/\.(glb|gltf)$/i,''):'Preview'); }
 function showPreview(){
@@ -1169,10 +1193,16 @@ async function deploy(){
       iosSrc=sb.storage.from(BUCKET).getPublicUrl(iosPath).data.publicUrl;
     }
 
-    const ins=await sb.from('assets').insert({user_id:user.id,name,format:fmt,size,path:glbPath,url,ios_src:iosSrc,ios_path:iosPath}).select().single();
+    const link=(document.getElementById('linkUrl').value||'').trim();
+    const allowDl=document.getElementById('allowDl').checked;
+    const baseRow={user_id:user.id,name,format:fmt,size,path:glbPath,url,ios_src:iosSrc,ios_path:iosPath};
+    let ins=await sb.from('assets').insert({...baseRow, link_url:link||null, allow_download:allowDl}).select().single();
+    if(ins.error && /link_url|allow_download|column|schema cache/i.test(ins.error.message||'')){
+      ins=await sb.from('assets').insert(baseRow).select().single();   // columns not migrated yet
+    }
     if(ins.error) throw ins.error;
     const r=ins.data;
-    assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null});
+    assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null,link:link||null,allowDl});
     renderRepo(); loadAsset(r.id);
     resetUpload();
     if(!isPly(url)) capturePosterFromStage(r.id);  // splats can't be captured by model-viewer; skip
@@ -1188,6 +1218,9 @@ function resetUpload(){
   document.getElementById('usdzText').textContent='USDZ model';
   document.getElementById('usdzSub').textContent='native iPhone / iPad AR';
   document.getElementById('assetName').value=''; glbInput.value=''; usdzInput.value='';
+  const lu=document.getElementById('linkUrl'); if(lu) lu.value='';
+  const ad=document.getElementById('allowDl'); if(ad) ad.checked=false;
+  const tb=document.getElementById('tempShareBtn'); if(tb) tb.style.display='none';
   const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
   // clear preview
   if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
@@ -1249,10 +1282,16 @@ function launchAR(){
 let shareToken=0;
 async function openShare(id){
   const a=assets.find(x=>x.id===(id||activeId)); if(!a){ toast('Load an asset first'); return; }
+  openShareObj(a);
+}
+async function openShareObj(a){
   const myToken=++shareToken;            // invalidate any in-flight previous build
   const params=new URLSearchParams(); params.set('name',a.name);
   if(a.src) params.set('model',a.src);
   if(a.iosSrc) params.set('ios',a.iosSrc);
+  if(a.allowDl) params.set('dl','1');
+  if(a.link) params.set('link', a.link);
+  if(a.exp) params.set('exp', String(a.exp));
   qrLink=`${location.origin}${location.pathname}?${params.toString()}`;
   qrName=a.name;
   const meta={ name:a.name, size:a.size||'—', fmt:(a.src?(a.iosSrc?a.fmt+'+USDZ':a.fmt):'USDZ') };
@@ -1265,6 +1304,37 @@ async function openShare(id){
   const watchdog=setTimeout(()=>cl.classList.remove('show'), 9000); // never let it stick
   try{ await buildShareCard(a, myToken, meta); }catch(e){ /* placeholder already drawn */ }
   clearTimeout(watchdog); if(myToken===shareToken) cl.classList.remove('show');
+}
+// upload the still-unsaved file to a temp/ folder and share a link that expires in 24h
+async function tempShare(){
+  if(!pendingGlb){ toast('Pick a model file first'); return; }
+  if(!sb){ toast('Backend not ready — deploy to your host first'); return; }
+  const btn=document.getElementById('tempShareBtn');
+  btn.classList.add('loading'); btn.style.pointerEvents='none';
+  try{
+    const folder='temp/'+(user?user.id:'anon');
+    const stamp=Date.now();
+    const glbPath=`${folder}/${stamp}-${slug(pendingGlb.name)}`;
+    const up1=await sb.storage.from(BUCKET).upload(glbPath, pendingGlb, {upsert:false, contentType:pendingGlb.type||'model/gltf-binary'});
+    if(up1.error) throw up1.error;
+    const url=sb.storage.from(BUCKET).getPublicUrl(glbPath).data.publicUrl;
+    let iosSrc=null;
+    if(pendingUsdz){
+      const ip=`${folder}/${stamp}-${slug(pendingUsdz.name)}`;
+      const up2=await sb.storage.from(BUCKET).upload(ip, pendingUsdz, {upsert:false, contentType:'model/vnd.usdz+zip'});
+      if(!up2.error) iosSrc=sb.storage.from(BUCKET).getPublicUrl(ip).data.publicUrl;
+    }
+    const ply=isPly(pendingGlb.name);
+    const name=document.getElementById('assetName').value.trim()||pendingGlb.name.replace(/\.(glb|gltf|ply|splat|ksplat)$/i,'');
+    const a={ name, src:url, iosSrc, fmt:ply?'PLY':pendingGlb.name.split('.').pop().toUpperCase(),
+              size:(pendingGlb.size/1048576).toFixed(1)+' MB',
+              allowDl:document.getElementById('allowDl').checked,
+              link:(document.getElementById('linkUrl').value||'').trim(),
+              exp:Date.now()+24*60*60*1000 };
+    openShareObj(a);
+    toast('Temporary link ready · expires in 24h');
+  }catch(e){ toast('Temp share failed: '+(e.message||e)); }
+  btn.classList.remove('loading'); btn.style.pointerEvents='';
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
@@ -1482,11 +1552,17 @@ async function saveQR(){
 }
 
 /* ===================== SHARED PUBLIC VIEW ===================== */
-function showShared(url,name,iosUrl){
+function showShared(url,name,iosUrl,opts){
+  opts=opts||{};
   document.getElementById('authGate').style.display='none';
   document.getElementById('app').style.display='none';
   document.getElementById('sharedView').style.display='flex';
   document.getElementById('sharedName').textContent=name||'3D model';
+  // extra viewer actions: download + external link
+  svModelUrl=url||iosUrl||''; svIosUrl=iosUrl||''; svLinkUrl=opts.link||'';
+  const dlBtn=document.getElementById('svDownload'), lnBtn=document.getElementById('svLink');
+  if(dlBtn) dlBtn.style.display = opts.dl ? '' : 'none';
+  if(lnBtn) lnBtn.style.display = svLinkUrl ? '' : 'none';
   const v=document.getElementById('sharedViewer'), empty=document.getElementById('sharedEmpty');
   if(url && isPly(url)){
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='none';
@@ -1518,6 +1594,33 @@ function showShared(url,name,iosUrl){
   });
 })();
 function goWorkspace(){ location.href=location.origin+location.pathname; }
+function svNormUrl(u){ return /^https?:\/\//i.test(u)?u:('https://'+u); }
+// Supabase serves a public object as an attachment when ?download= is appended
+function svForceDownload(u){
+  if(!u) return;
+  const d=u+(u.includes('?')?'&':'?')+'download=';
+  const a=document.createElement('a'); a.href=d; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(),0);
+}
+function downloadShared(){
+  if(!svModelUrl && !svIosUrl){ toast('Nothing to download'); return; }
+  if(svModelUrl) svForceDownload(svModelUrl);
+  if(svIosUrl && svIosUrl!==svModelUrl) setTimeout(()=>svForceDownload(svIosUrl), 500);
+  toast('Downloading…');
+}
+function openSharedLink(){ if(svLinkUrl) window.open(svNormUrl(svLinkUrl),'_blank','noopener'); }
+function showExpired(){
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('app').style.display='none';
+  document.getElementById('sharedView').style.display='flex';
+  const v=document.getElementById('sharedViewer'); if(v){ v.removeAttribute('src'); v.style.display='none'; }
+  const sp=document.getElementById('splatStageS'); if(sp) sp.innerHTML='';
+  const lo=document.getElementById('loaderOverlayS'); if(lo) lo.style.display='none';
+  const nm=document.getElementById('sharedName'); if(nm) nm.textContent='Link expired';
+  ['svDownload','svLink'].forEach(id=>{const b=document.getElementById(id); if(b) b.style.display='none';});
+  const ar=document.querySelector('#sharedView .tool.ar'); if(ar) ar.style.display='none';
+  const empty=document.getElementById('sharedEmpty');
+  if(empty){ empty.style.display='flex'; empty.innerHTML='<div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><p>This shared preview has expired</p><small>Temporary shares last 24 hours. Ask the owner to share it again.</small>'; }
+}
 
 /* ===================== UTILS ===================== */
 /* ===================== FX HELPERS ===================== */
