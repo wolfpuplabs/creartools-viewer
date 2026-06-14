@@ -96,7 +96,7 @@
   .logo .mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,#16161b,#0c0c0f);border:1px solid var(--line-strong);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .logo .mark svg{width:19px;height:19px}
   .logo .word{font-family:"Orbitron","Syne",sans-serif;font-size:13px;letter-spacing:.04em;font-weight:800}
-  .logo .word b{color:var(--signal)}
+  .logo .word b{background:linear-gradient(120deg,#cdf24a 0%,#62e0c8 50%,#5aa8ff 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
 
   /* AUTH */
   #authGate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent), var(--bg)}
@@ -105,7 +105,7 @@
   .auth-aside .cube{position:absolute;right:-40px;bottom:-30px;width:300px;height:300px;opacity:.5;animation:spin 26s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .auth-aside h1{font-family:"Syne",sans-serif;font-weight:800;font-size:clamp(30px,4vw,42px);line-height:1.02;letter-spacing:-.02em;margin-top:26px;position:relative}
-  .auth-aside h1 em{font-style:normal;color:var(--signal)}
+  .auth-aside h1 em{font-style:normal;color:var(--signal);font-family:"Orbitron","Syne",sans-serif;font-weight:800;font-size:.86em;letter-spacing:.01em}
   .auth-aside p{color:var(--text-2);max-width:34ch;margin-top:14px;font-size:14px;position:relative}
   .auth-feats{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:2}
   .auth-main{padding:40px;background:var(--surface)}
@@ -312,7 +312,7 @@
   @keyframes floatUp{0%{transform:translate(0,0) scale(.55);opacity:0}10%{opacity:var(--op,.6)}88%{opacity:calc(var(--op,.6) * .55)}100%{transform:translate(var(--dx,0),-106vh) scale(1);opacity:0}}
 
   /* neon flicker on the wordmark */
-  .logo .word b{text-shadow:0 0 10px rgba(205,242,74,.55)}
+  .logo .word b{filter:drop-shadow(0 0 7px rgba(120,200,255,.45)) drop-shadow(0 0 4px rgba(205,242,74,.35))}
   @keyframes flicker{0%,18%,22%,25%,53%,57%,100%{opacity:1}20%,23%,55%{opacity:.55}}
   .logo .word{animation:flicker 8s steps(1,end) infinite}
 
@@ -429,6 +429,11 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#cdf24a"/><stop offset=".5" stop-color="#62e0c8"/><stop offset="1" stop-color="#5aa8ff"/>
+  </linearGradient>
+</defs></svg>
 
 <div class="bg-glow"></div>
 <div class="bg-nebula"><span></span><span></span><span></span></div>
@@ -446,7 +451,7 @@
         <path d="M100 20 L100 100 M100 100 L170 60 M100 100 L30 60 M100 100 L100 180"/>
         <path d="M30 60 L100 20 L170 60 L100 100 Z" stroke="rgba(205,242,74,.7)"/>
       </svg>
-      <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
+      <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
       <div>
         <h1>Build, view &amp;<br/>share in <em>spatial 3D.</em></h1>
         <p>Upload a GLB for web &amp; Android AR, add a USDZ for native iPhone AR, and share both in one link.</p>
@@ -456,7 +461,7 @@
 
     <div class="auth-main">
       <span class="eyebrow">Workspace access</span>
-      <h2 style="font-family:'Syne';font-size:24px;font-weight:800;margin:8px 0 22px;letter-spacing:-.02em">Welcome back</h2>
+      <h2 style="font-family:'Orbitron','Syne',sans-serif;font-size:21px;font-weight:800;margin:8px 0 22px;letter-spacing:.01em" id="authHeading">Welcome back</h2>
       <div class="auth-tabs">
         <button class="auth-tab active" data-mode="login" onclick="setMode('login')">Login</button>
         <button class="auth-tab" data-mode="register" onclick="setMode('register')">Register</button>
@@ -476,7 +481,7 @@
 <!-- =================== APP =================== -->
 <div id="app">
   <header class="bar">
-    <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
+    <a class="logo" href="#"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
     <div class="bar-right">
       <span class="pill"><span class="dot live"></span><span id="userEmail">workspace</span></span>
       <button class="btn btn-ghost sndbtn on" id="soundBtn" title="Sound FX on/off" onclick="toggleSound()">
@@ -618,7 +623,7 @@
 <!-- =================== SHARED PUBLIC VIEW =================== -->
 <div id="sharedView">
   <header>
-    <a class="logo" href="#" onclick="goWorkspace();return false"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="var(--signal)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
+    <a class="logo" href="#" onclick="goWorkspace();return false"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="1.6"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></span><span class="word">CRE<b>AR</b>TOR</span></a>
     <button class="btn btn-ghost" onclick="goWorkspace()" style="padding:9px 16px">Open workspace →</button>
   </header>
   <div class="sv-stage">
@@ -1484,17 +1489,26 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   // ---- header ----
   roundRect(ctx,30,30,60,60,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1.4; ctx.stroke();
-  cubeGlyph(ctx,60,60,1.65,2.3,'#ffffff');
-  // brand title — Orbitron wordmark with the centre "AR" highlighted, auto-fit so it never clips
+  const cubeGrad=ctx.createLinearGradient(36,36,84,84);
+  cubeGrad.addColorStop(0,'#cdf24a'); cubeGrad.addColorStop(.5,'#62e0c8'); cubeGrad.addColorStop(1,'#5aa8ff');
+  cubeGlyph(ctx,60,60,1.65,2.3,cubeGrad);
+  // brand title — Orbitron wordmark with the centre "AR" in a lime→blue gradient (matches the card border)
   const tx=104, titleMax=rEdge-tx;
-  const segs=[['CRE','#ffffff'],['AR','#cdf24a'],['TOR','#ffffff']];
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
   let lp=34;
-  const wordW=()=>{ ctx.font=`800 ${lp}px "Orbitron","Syne",sans-serif`; const ls=lp*0.01; let w=-ls; for(const[t]of segs) for(const ch of t) w+=ctx.measureText(ch).width+ls; return w; };
-  while(lp>14 && wordW()>titleMax) lp-=1;
+  const segText='CREARTOR';
+  const measureWord=()=>{ ctx.font=`800 ${lp}px "Orbitron","Syne",sans-serif`; const ls=lp*0.01; let w=-ls; for(const ch of segText) w+=ctx.measureText(ch).width+ls; return w; };
+  while(lp>14 && measureWord()>titleMax) lp-=1;
   ctx.font=`800 ${lp}px "Orbitron","Syne",sans-serif`;
   const ls=lp*0.01; let lgx=tx;
-  for(const [t,col] of segs){ ctx.fillStyle=col; for(const ch of t){ ctx.fillText(ch, lgx, 60); lgx+=ctx.measureText(ch).width+ls; } }
+  const drawSeg=(t,style)=>{ ctx.fillStyle=style; for(const ch of t){ ctx.fillText(ch, lgx, 60); lgx+=ctx.measureText(ch).width+ls; } };
+  drawSeg('CRE','#ffffff');
+  // AR — gradient spanning just those two letters
+  let arW=-ls; for(const ch of 'AR') arW+=ctx.measureText(ch).width+ls;
+  const arGrad=ctx.createLinearGradient(lgx,0,lgx+arW,0);
+  arGrad.addColorStop(0,'#cdf24a'); arGrad.addColorStop(.5,'#62e0c8'); arGrad.addColorStop(1,'#5aa8ff');
+  drawSeg('AR',arGrad);
+  drawSeg('TOR','#ffffff');
   ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='400 11.5px "Space Mono", monospace';
   ctx.fillText('WEBAR VIEWER BY', tx+2, 77);
   ctx.fillText('WOLFPUPLABS', tx+2, 92);
