@@ -28,7 +28,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet" />
 
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1346,7 +1346,7 @@ async function tempShare(){
 function closeShare(){document.getElementById('shareModal').classList.remove('show')}
 function copyLink(){const i=document.getElementById('shareLink');i.select();navigator.clipboard?.writeText(i.value);toast('Link copied to clipboard')}
 
-async function fontsReady(){ try{ await Promise.all([document.fonts.load('800 40px Syne'),document.fonts.load('700 16px "Space Mono"'),document.fonts.load('400 14px "Space Mono"')]); }catch(e){} }
+async function fontsReady(){ try{ await Promise.all([document.fonts.load('800 40px Syne'),document.fonts.load('700 16px "Space Mono"'),document.fonts.load('400 14px "Space Mono"'),document.fonts.load('800 40px "Orbitron"'),document.fonts.load('900 40px "Orbitron"')]); }catch(e){} }
 
 // draw the brand cube glyph (24-grid) centred at cx,cy with grid-unit scale s
 function cubeGlyph(ctx, cx, cy, s, lw, color){
@@ -1485,14 +1485,19 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   roundRect(ctx,30,30,60,60,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1.4; ctx.stroke();
   cubeGlyph(ctx,60,60,1.65,2.3,'#ffffff');
-  // brand title — auto-fit so it never clips the edge
+  // brand title — Orbitron wordmark with the centre "AR" highlighted, auto-fit so it never clips
   const tx=104, titleMax=rEdge-tx;
-  const tp=fit('CREARTOR', titleMax, 32, '800');
-  ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#ffffff';
-  ctx.font=`800 ${tp}px "Syne", sans-serif`; ctx.fillText('CREARTOR', tx, 58);
+  const segs=[['CRE','#ffffff'],['AR','#cdf24a'],['TOR','#ffffff']];
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  let lp=34;
+  const wordW=()=>{ ctx.font=`800 ${lp}px "Orbitron","Syne",sans-serif`; const ls=lp*0.01; let w=-ls; for(const[t]of segs) for(const ch of t) w+=ctx.measureText(ch).width+ls; return w; };
+  while(lp>14 && wordW()>titleMax) lp-=1;
+  ctx.font=`800 ${lp}px "Orbitron","Syne",sans-serif`;
+  const ls=lp*0.01; let lgx=tx;
+  for(const [t,col] of segs){ ctx.fillStyle=col; for(const ch of t){ ctx.fillText(ch, lgx, 60); lgx+=ctx.measureText(ch).width+ls; } }
   ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='400 11.5px "Space Mono", monospace';
-  ctx.fillText('WEBAR VIEWER BY', tx+2, 75);
-  ctx.fillText('WOLFPUPLABS', tx+2, 90);
+  ctx.fillText('WEBAR VIEWER BY', tx+2, 77);
+  ctx.fillText('WOLFPUPLABS', tx+2, 92);
 
   // ---- asset render (upper-centre, bounded so it can't touch the QR) ----
   const stageY=108, stageH=276, baseY=stageY+stageH;
