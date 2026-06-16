@@ -52,6 +52,20 @@
     }
     catch(e){ console.warn('Splat lib failed to load', e); window.__GS = null; return null; }
   })();
+  // FBX viewer libs (Three.js FBXLoader + OrbitControls)
+  window.__FBX_READY = (async () => {
+    try{
+      const [THREE, fbxMod, ctrlMod] = await Promise.all([
+        import('three'),
+        import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js'),
+        import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js')
+      ]);
+      window.__THREE = THREE;
+      window.__FBXLoader = fbxMod.FBXLoader;
+      window.__OrbitControls = ctrlMod.OrbitControls;
+      return true;
+    }catch(e){ console.warn('FBX libs failed to load', e); window.__FBXLoader=null; return false; }
+  })();
 </script>
 
 <style>
@@ -96,7 +110,7 @@
   .logo .mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,#16161b,#0c0c0f);border:1px solid var(--line-strong);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .logo .mark svg{width:19px;height:19px}
   .logo .word{font-family:"Orbitron","Syne",sans-serif;font-size:13px;letter-spacing:.04em;font-weight:800}
-  .logo .word b{background:linear-gradient(120deg,#cdf24a 0%,#62e0c8 50%,#5aa8ff 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .logo .word b{background:linear-gradient(120deg,#43e6f0 0%,#5b7cff 55%,#b15cff 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
 
   /* AUTH */
   #authGate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse 80% 60% at 50% -10%, rgba(205,242,74,.06), transparent), var(--bg)}
@@ -312,7 +326,7 @@
   @keyframes floatUp{0%{transform:translate(0,0) scale(.55);opacity:0}10%{opacity:var(--op,.6)}88%{opacity:calc(var(--op,.6) * .55)}100%{transform:translate(var(--dx,0),-106vh) scale(1);opacity:0}}
 
   /* neon flicker on the wordmark */
-  .logo .word b{filter:drop-shadow(0 0 7px rgba(120,200,255,.45)) drop-shadow(0 0 4px rgba(205,242,74,.35))}
+  .logo .word b{filter:drop-shadow(0 0 7px rgba(91,124,255,.5)) drop-shadow(0 0 4px rgba(177,92,255,.4))}
   @keyframes flicker{0%,18%,22%,25%,53%,57%,100%{opacity:1}20%,23%,55%{opacity:.55}}
   .logo .word{animation:flicker 8s steps(1,end) infinite}
 
@@ -415,9 +429,9 @@
 
   @media (prefers-reduced-motion: reduce){ #loaderCube,.lo-cube,#loaderPath,.lo-path,.lo-orbit,.lo-label{animation:none!important} }
   .thumb-img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;border-radius:inherit}
-  #splatStage,#splatStageS{position:absolute;inset:0;display:none;background:transparent;z-index:1}
-  #splatStage.show,#splatStageS.show{display:block}
-  #splatStage canvas,#splatStageS canvas{width:100%!important;height:100%!important;display:block;border-radius:20px}
+  #splatStage,#splatStageS,#fbxStage,#fbxStageS{position:absolute;inset:0;display:none;background:transparent;z-index:1}
+  #splatStage.show,#splatStageS.show,#fbxStage.show,#fbxStageS.show{display:block}
+  #splatStage canvas,#splatStageS canvas,#fbxStage canvas,#fbxStageS canvas{width:100%!important;height:100%!important;display:block;border-radius:20px}
 
   /* low-FX mode (iOS / small screens / reduced-motion): drop the GPU-heavy effects */
   body.lowfx .bg-nebula{display:none}
@@ -431,7 +445,7 @@
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#cdf24a"/><stop offset=".5" stop-color="#62e0c8"/><stop offset="1" stop-color="#5aa8ff"/>
+    <stop offset="0" stop-color="#43e6f0"/><stop offset=".55" stop-color="#5b7cff"/><stop offset="1" stop-color="#b15cff"/>
   </linearGradient>
 </defs></svg>
 
@@ -520,6 +534,7 @@
         </div>
         <model-viewer id="stageViewer" camera-controls touch-action="pan-y" disable-pan autoplay shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
         <div id="splatStage"></div>
+        <div id="fbxStage"></div>
         <div class="scan-sweep"></div>
         <div class="stage-empty" id="stageEmpty">
           <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
@@ -568,8 +583,8 @@
             <div class="dropzone" id="dzGlb">
               <span class="dz-tag">Required</span>
               <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M3 7 L12 12 L21 7 M12 12 L12 22"/></svg></div>
-              <p id="glbText">GLB / GLTF / PLY</p>
-              <small id="glbSub">3D + Android AR · or .ply splat</small>
+              <p id="glbText">GLB / GLTF / PLY / FBX</p>
+              <small id="glbSub">3D + AR · or .ply / .fbx (web only)</small>
             </div>
             <div class="dropzone opt" id="dzUsdz">
               <span class="dz-tag">Optional</span>
@@ -645,6 +660,7 @@
     </div>
     <model-viewer id="sharedViewer" camera-controls touch-action="pan-y" disable-pan auto-rotate shadow-intensity="1.1" exposure="1.05" ar ar-modes="webxr scene-viewer quick-look" interaction-prompt="none"></model-viewer>
     <div id="splatStageS"></div>
+    <div id="fbxStageS"></div>
     <div class="stage-empty" id="sharedEmpty">
       <div class="se-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v8l8 4 8-4V6l-8-4Z"/><path d="M4 6l8 4 8-4M12 10v8"/></svg></div>
       <p>AR-only model</p>
@@ -718,6 +734,8 @@ let svModelUrl='', svIosUrl='', svLinkUrl='';
 
 const isUsdz = u => /\.usdz(\?|$)/i.test(u||'');
 const isPly  = u => /\.(ply|splat|ksplat)(\?|$)/i.test(u||'');
+const isFbx  = u => /\.fbx(\?|$)/i.test(u||'');
+const isWebOnly = u => isPly(u) || isFbx(u);   // non model-viewer formats (no Quick Look / Scene Viewer AR)
 
 /* ===================== GAUSSIAN SPLAT (.ply) VIEWER ===================== */
 let splatViewer=null, splatToken=0, splatRootId='splatStage';
@@ -779,6 +797,70 @@ function captureSplatStage(){
     if(!cv) return null;
     const d=cv.toDataURL('image/png');
     return (d && d.length>3000) ? d : null;   // guard against a blank/transparent capture
+  }catch(e){ return null; }
+}
+
+// ===================== FBX VIEWER (Three.js) =====================
+let fbxState=null, fbxToken=0, fbxRootId='fbxStage';
+function destroyFbx(){
+  const s=fbxState; fbxState=null;
+  if(s){
+    try{ cancelAnimationFrame(s.raf); }catch(e){}
+    try{ s.controls && s.controls.dispose(); }catch(e){}
+    try{ s.renderer && s.renderer.dispose(); }catch(e){}
+  }
+  ['fbxStage','fbxStageS'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.classList.remove('show'); el.innerHTML=''; } });
+}
+async function showFbx(url, rootId){
+  rootId=rootId||'fbxStage'; fbxRootId=rootId;
+  const mytok=++fbxToken;
+  const el=document.getElementById(rootId); if(!el) return;
+  destroyFbx();
+  el.classList.add('show');
+  const ok = window.__FBXLoader || (window.__FBX_READY ? await window.__FBX_READY : false);
+  if(mytok!==fbxToken) return;                       // superseded while libs loaded
+  const THREE=window.__THREE, FBXLoader=window.__FBXLoader, OrbitControls=window.__OrbitControls;
+  if(!THREE||!FBXLoader){ hideLoader(); hideLoaderS(); toast('FBX viewer unavailable (offline?)'); el.classList.remove('show'); return; }
+  try{
+    const W=el.clientWidth||640, Hh=el.clientHeight||640;
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(45, W/Hh, 0.1, 8000);
+    const renderer=new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, alpha:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.setSize(W,Hh);
+    try{ renderer.outputColorSpace=THREE.SRGBColorSpace; }catch(_){}
+    el.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xffffff,0x404455,1.15));
+    const key=new THREE.DirectionalLight(0xffffff,1.7); key.position.set(4,7,5); scene.add(key);
+    const rim=new THREE.DirectionalLight(0x88aaff,0.7); rim.position.set(-5,3,-4); scene.add(rim);
+    const controls=OrbitControls ? new OrbitControls(camera, renderer.domElement) : null;
+    if(controls){ controls.enableDamping=true; controls.dampingFactor=0.08; controls.autoRotate=true; controls.autoRotateSpeed=1.1; }
+    new FBXLoader().load(url, (obj)=>{
+      if(mytok!==fbxToken){ return; }
+      const box=new THREE.Box3().setFromObject(obj);
+      const size=box.getSize(new THREE.Vector3()), center=box.getCenter(new THREE.Vector3());
+      const maxDim=Math.max(size.x,size.y,size.z)||1, scale=2.4/maxDim;
+      obj.scale.setScalar(scale);
+      obj.position.sub(center.multiplyScalar(scale));
+      scene.add(obj);
+      camera.position.set(0,0.7,4.4); if(controls){ controls.target.set(0,0,0); controls.update(); }
+      let mixer=null; const clock=new THREE.Clock();
+      if(obj.animations && obj.animations.length){ mixer=new THREE.AnimationMixer(obj); mixer.clipAction(obj.animations[0]).play(); }
+      fbxState={renderer,controls,scene,camera,mixer,token:mytok,raf:0};
+      const render=()=>{ const s=fbxState; if(!s||s.token!==mytok) return; s.raf=requestAnimationFrame(render); if(mixer) mixer.update(clock.getDelta()); if(controls) controls.update(); renderer.render(scene,camera); };
+      render();
+      hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters();
+      const nd=document.getElementById('nowDim'); if(nd) nd.textContent='loaded ✓';
+      if(rootId==='fbxStage' && activeId){ const aid=activeId; setTimeout(async()=>{ let d=captureFbxStage(); if(d){ d=await trimPoster(d); posterCache[aid]=d; savePoster(aid,d); const w=document.getElementById('thwrap-'+aid); if(w) w.innerHTML=`<img class="thumb-img" src="${d}" alt="" loading="lazy" decoding="async">`; persistPoster(aid,d); } }, 700); }
+    }, undefined, (err)=>{ console.warn('FBX load error', err); hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters(); toast('Could not load this FBX'); destroyFbx(); });
+  }catch(e){ hideLoader(); hideLoaderS(); stageBusy=false; clearTimeout(window.__stageWD); drainPosters(); toast('Could not load this FBX'); destroyFbx(); }
+}
+function captureFbxStage(){
+  try{
+    const s=fbxState;
+    if(s&&s.renderer&&s.scene&&s.camera){ s.renderer.render(s.scene,s.camera); const d=s.renderer.domElement.toDataURL('image/png'); return (d&&d.length>3000)?d:null; }
+    const cv=document.getElementById(fbxRootId||'fbxStage')?.querySelector('canvas');
+    if(!cv) return null; const d=cv.toDataURL('image/png'); return (d&&d.length>3000)?d:null;
   }catch(e){ return null; }
 }
 
@@ -965,13 +1047,13 @@ function trimPoster(dataUrl){
   });
 }
 function observePosters(){
-  const need=a=>a.src && !isPly(a.src) && !(a.poster||posterCache[a.id]);
+  const need=a=>a.src && !isWebOnly(a.src) && !(a.poster||posterCache[a.id]);
   if(!('IntersectionObserver' in window)){ assets.forEach(a=>{ if(need(a)) queuePoster(a.id,a.src); }); return; }
   if(posterIO) posterIO.disconnect();
   posterIO=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ posterIO.unobserve(en.target); queuePoster(en.target.dataset.id, en.target.dataset.src); } }); },{root:document.getElementById('repoList'),rootMargin:'150px'});
-  document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !isPly(w.dataset.src) && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
+  document.querySelectorAll('#repoList .thumb[data-src]').forEach(w=>{ const id=w.dataset.id; if(w.dataset.src && !isWebOnly(w.dataset.src) && !posterCache[id] && w.querySelector('svg')) posterIO.observe(w); });
 }
-function queuePoster(id,src){ if(!src||isPly(src)||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
+function queuePoster(id,src){ if(!src||isWebOnly(src)||posterCache[id]||posterQ.some(q=>q.id===id)) return; posterQ.push({id,src}); drainPosters(); }
 // regenerate the thumbnail from EXACTLY what's shown on the stage right now (current angle/zoom)
 async function regenPoster(e,id){
   if(e) e.stopPropagation();
@@ -980,6 +1062,7 @@ async function regenPoster(e,id){
   let url=null;
   try{
     if(isPly(a.src)){ url=captureSplatStage(); }
+    else if(isFbx(a.src)){ url=captureFbxStage(); }
     else { const v=document.getElementById('stageViewer'); url = (v&&v.toDataURL) ? v.toDataURL('image/webp',0.9) : null; }
   }catch(_){ url=null; }
   if(!url || url.length<200){ toast('Could not capture the stage — try again'); return; }
@@ -1051,38 +1134,42 @@ function loadAsset(id){
   activeId=id;
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
   if(a.src){
-    const ply=isPly(a.src);
-    if(!ply) destroySplat();                       // leaving a splat -> tear it down
+    const ply=isPly(a.src), fbx=isFbx(a.src), webOnly=ply||fbx;
+    if(!ply) destroySplat();
+    if(!fbx) destroyFbx();
     stageBusy=true;
     try{ document.getElementById('posterMV').removeAttribute('src'); }catch(e){} // free the background renderer so the stage loads first
-    v.style.display=ply?'none':''; empty.style.display='none'; showLoader();
+    v.style.display=webOnly?'none':''; empty.style.display='none'; showLoader();
     document.getElementById('nowDim').textContent='loading…';
     if(ply){
       v.removeAttribute('src');
-      showSplat(a.src);                             // clears stageBusy + hides loader when done
+      showSplat(a.src);
       clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000);
+    }else if(fbx){
+      v.removeAttribute('src');
+      showFbx(a.src);
+      clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 45000);
     }else{
       v.setAttribute('src',a.src);
       v.addEventListener('load',()=>{ document.getElementById('nowDim').textContent='loaded ✓'; if(soundOn) sfxScan(0.09); },{once:true});
       clearTimeout(window.__stageWD); window.__stageWD=setTimeout(()=>{ hideLoader(); stageBusy=false; drainPosters(); }, 30000); // never leave the loader stuck
     }
   }else{
-    destroySplat();
+    destroySplat(); destroyFbx();
     v.removeAttribute('src'); v.style.display='none'; empty.style.display='flex';
     document.getElementById('nowDim').textContent='AR-only';
     document.getElementById('animBtn').classList.add('hidden');
   }
   if(a.iosSrc) v.setAttribute('ios-src',a.iosSrc); else v.removeAttribute('ios-src');
-  const ply=a.src&&isPly(a.src);
-  const fmtLabel = ply ? 'PLY · SPLAT' : (a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ');
+  const ply=a.src&&isPly(a.src), fbx=a.src&&isFbx(a.src), webOnly=ply||fbx;
+  const fmtLabel = ply ? 'PLY · SPLAT' : fbx ? 'FBX · 3D' : (a.src ? (a.iosSrc?a.fmt+' + USDZ':a.fmt) : 'USDZ');
   setStageName(a.name);
   document.getElementById('nowFmt').textContent=fmtLabel;
   document.getElementById('mFormat').textContent=fmtLabel;
   document.getElementById('mSize').textContent=a.size;
-  document.getElementById('mAr').textContent = ply ? 'Web only' : (a.src&&a.iosSrc ? 'iOS + Android' : (a.iosSrc?'iOS only':'Android/WebXR'));
-  // splats can't use Quick Look / Scene Viewer — hide AR + animation tools for them
-  const arBtn=document.querySelector('.tool.ar'); if(arBtn) arBtn.style.display = ply ? 'none' : '';
-  if(ply){ ['animBtn','loopBtn','animResetBtn'].forEach(i=>document.getElementById(i)?.classList.add('hidden')); }
+  document.getElementById('mAr').textContent = webOnly ? 'Web only' : (a.src&&a.iosSrc ? 'iOS + Android' : (a.iosSrc?'iOS only':'Android/WebXR'));
+  const arBtn=document.querySelector('.tool.ar'); if(arBtn) arBtn.style.display = webOnly ? 'none' : '';
+  if(webOnly){ ['animBtn','loopBtn','animResetBtn'].forEach(i=>document.getElementById(i)?.classList.add('hidden')); }
   renderRepo();
 }
 async function delAsset(id){
@@ -1114,11 +1201,11 @@ function setupDz(zone, input, kind){
 function pick(kind, file){
   if(!file) return;
   if(kind==='glb'){
-    if(!/\.(glb|gltf|ply|splat|ksplat)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf, .ply, .splat or .ksplat'); return; }
+    if(!/\.(glb|gltf|ply|splat|ksplat|fbx)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf, .ply, .splat, .ksplat or .fbx'); return; }
     pendingGlb=file; dzGlb.classList.add('has');
     document.getElementById('glbText').textContent=file.name;
     document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
-    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply|splat|ksplat)$/i,'');
+    const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply|splat|ksplat|fbx)$/i,'');
     if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
     previewGlbUrl=URL.createObjectURL(file);
     showPreview();
@@ -1141,12 +1228,13 @@ function showPreview(){
   previewing=true;
   const nm=previewName();
   const ply = pendingGlb && /\.(ply|splat|ksplat)$/i.test(pendingGlb.name);
-  const fmt = ply ? 'PLY' : (pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB');
-  // small preview thumbnail in the panel (model-viewer can't show splats — skip it for .ply)
+  const fbx = pendingGlb && /\.fbx$/i.test(pendingGlb.name);
+  const fmt = ply ? 'PLY' : fbx ? 'FBX' : (pendingGlb?pendingGlb.name.split('.').pop().toUpperCase():'GLB');
+  // small preview thumbnail in the panel (model-viewer can't show splats/fbx — skip it for those)
   const wrap=document.getElementById('previewWrap'), pmv=document.getElementById('previewMV');
-  if(ply){ pmv.removeAttribute('src'); } else { pmv.setAttribute('src',previewGlbUrl); }
+  if(ply||fbx){ pmv.removeAttribute('src'); } else { pmv.setAttribute('src',previewGlbUrl); }
   document.getElementById('previewName').textContent=nm;
-  document.getElementById('previewSub').textContent=(ply?'PLY splat':(pendingUsdz?'GLB + USDZ':fmt))+' · live preview, not saved';
+  document.getElementById('previewSub').textContent=(ply?'PLY splat':fbx?'FBX 3D':(pendingUsdz?'GLB + USDZ':fmt))+' · live preview, not saved';
   wrap.style.display='flex';
   // load into the main stage
   const v=document.getElementById('stageViewer'), empty=document.getElementById('stageEmpty');
@@ -1161,8 +1249,11 @@ function showPreview(){
   if(ply){
     v.style.display='none'; v.removeAttribute('src');
     showSplat(previewGlbUrl, 'splatStage', pendingGlb.name.split('.').pop());
+  }else if(fbx){
+    v.style.display='none'; v.removeAttribute('src');
+    showFbx(previewGlbUrl, 'fbxStage');
   }else{
-    destroySplat();
+    destroySplat(); destroyFbx();
     v.style.display='';
     if(previewUsdzUrl) v.setAttribute('ios-src',previewUsdzUrl); else v.removeAttribute('ios-src');
     v.setAttribute('src',previewGlbUrl);
@@ -1210,7 +1301,7 @@ async function deploy(){
     assets.unshift({id:r.id,name:r.name,src:r.url,iosSrc:r.ios_src,fmt:r.format,size:r.size,path:r.path,iosPath:r.ios_path,poster:null,link:link||null,allowDl});
     renderRepo(); loadAsset(r.id);
     resetUpload();
-    if(!isPly(url)) capturePosterFromStage(r.id);  // splats can't be captured by model-viewer; skip
+    if(!isWebOnly(url)) capturePosterFromStage(r.id);  // splats can't be captured by model-viewer; skip
     toast(iosSrc?'Saved with iOS AR ✓':'Asset saved ✓'); sfxOk();
   }catch(e){ toast('Upload failed: '+(e.message||e)); }
   deployLoading(false);
@@ -1218,7 +1309,7 @@ async function deploy(){
 function resetUpload(){
   pendingGlb=null; pendingUsdz=null;
   dzGlb.classList.remove('has'); dzUsdz.classList.remove('has');
-  document.getElementById('glbText').textContent='GLB / GLTF / PLY';
+  document.getElementById('glbText').textContent='GLB / GLTF / PLY / FBX';
   document.getElementById('glbSub').textContent='3D viewer + Android AR';
   document.getElementById('usdzText').textContent='USDZ model';
   document.getElementById('usdzSub').textContent='native iPhone / iPad AR';
@@ -1277,7 +1368,7 @@ function resetCam(){
 function fullscreen(){const s=document.querySelector('.stage');if(!document.fullscreenElement)s.requestFullscreen?.();else document.exitFullscreen?.()}
 function launchAR(){
   const a=assets.find(x=>x.id===activeId);
-  if(a && isPly(a.src)){ toast('Splats are web-only — AR isn’t available for .ply'); return; }
+  if(a && isWebOnly(a.src)){ toast('This format is web-only — AR isn’t available'); return; }
   const v=document.getElementById('stageViewer');
   speedLines(document.querySelector('.stage')); sfxAR();
   setTimeout(()=>{ if(v.canActivateAR) v.activateAR(); else toast('Open on a mobile device to view in AR'); }, 240);
@@ -1329,16 +1420,17 @@ async function tempShare(){
       const up2=await sb.storage.from(BUCKET).upload(ip, pendingUsdz, {upsert:false, contentType:'model/vnd.usdz+zip'});
       if(!up2.error) iosSrc=sb.storage.from(BUCKET).getPublicUrl(ip).data.publicUrl;
     }
-    const ply=isPly(pendingGlb.name);
-    const name=document.getElementById('assetName').value.trim()||pendingGlb.name.replace(/\.(glb|gltf|ply|splat|ksplat)$/i,'');
+    const ply=isPly(pendingGlb.name), fbx=isFbx(pendingGlb.name);
+    const name=document.getElementById('assetName').value.trim()||pendingGlb.name.replace(/\.(glb|gltf|ply|splat|ksplat|fbx)$/i,'');
     // snapshot the model that's already shown on the stage so the card has a real thumbnail
     let poster=null;
     try{
       if(ply){ poster=captureSplatStage(); }
+      else if(fbx){ poster=captureFbxStage(); }
       else { const sv=document.getElementById('stageViewer'); poster = (sv&&sv.toDataURL)? sv.toDataURL('image/webp',0.92):null; }
       if(poster) poster=await trimPoster(poster);
     }catch(_){}
-    const a={ name, src:url, iosSrc, fmt:ply?'PLY':pendingGlb.name.split('.').pop().toUpperCase(),
+    const a={ name, src:url, iosSrc, fmt:ply?'PLY':fbx?'FBX':pendingGlb.name.split('.').pop().toUpperCase(),
               size:(pendingGlb.size/1048576).toFixed(1)+' MB', poster,
               allowDl:document.getElementById('allowDl').checked,
               link:(document.getElementById('linkUrl').value||'').trim(),
@@ -1443,6 +1535,7 @@ async function buildShareCard(a, token, meta){
   let img=null;
   const ply=isPly(a.src);
   if(ply && a.id===activeId){ const d=captureSplatStage(); if(d) img=await withTimeout(urlToImg(d),2000); }
+  if(!img && isFbx(a.src) && a.id===activeId){ const d=captureFbxStage(); if(d) img=await withTimeout(urlToImg(d),2000); }
   if(!live()) return;
   if(!ply && a.id===activeId)            img = img || await withTimeout(captureStage(), 2500);
   if(!live()) return;
@@ -1490,7 +1583,7 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   roundRect(ctx,30,30,60,60,16); ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1.4; ctx.stroke();
   const cubeGrad=ctx.createLinearGradient(36,36,84,84);
-  cubeGrad.addColorStop(0,'#cdf24a'); cubeGrad.addColorStop(.5,'#62e0c8'); cubeGrad.addColorStop(1,'#5aa8ff');
+  cubeGrad.addColorStop(0,'#43e6f0'); cubeGrad.addColorStop(.55,'#5b7cff'); cubeGrad.addColorStop(1,'#b15cff');
   cubeGlyph(ctx,60,60,1.65,2.3,cubeGrad);
   // brand title — Orbitron wordmark with the centre "AR" in a lime→blue gradient (matches the card border)
   const tx=104, titleMax=rEdge-tx;
@@ -1506,7 +1599,7 @@ function composeTradingCard({assetImg, qrNode, name, size, fmt}){
   // AR — gradient spanning just those two letters
   let arW=-ls; for(const ch of 'AR') arW+=ctx.measureText(ch).width+ls;
   const arGrad=ctx.createLinearGradient(lgx,0,lgx+arW,0);
-  arGrad.addColorStop(0,'#cdf24a'); arGrad.addColorStop(.5,'#62e0c8'); arGrad.addColorStop(1,'#5aa8ff');
+  arGrad.addColorStop(0,'#43e6f0'); arGrad.addColorStop(.55,'#5b7cff'); arGrad.addColorStop(1,'#b15cff');
   drawSeg('AR',arGrad);
   drawSeg('TOR','#ffffff');
   ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='400 11.5px "Space Mono", monospace';
@@ -1596,7 +1689,13 @@ function showShared(url,name,iosUrl,opts){
     const arb=document.querySelector('#sharedView .tool.ar, #sharedView .sv-ar'); if(arb) arb.style.display='none';
     return;
   }
-  destroySplat();
+  if(url && isFbx(url)){
+    v.removeAttribute('src'); v.style.display='none'; empty.style.display='none';
+    showLoaderS(); showFbx(url,'fbxStageS');
+    const arb=document.querySelector('#sharedView .tool.ar, #sharedView .sv-ar'); if(arb) arb.style.display='none';
+    return;
+  }
+  destroySplat(); destroyFbx();
   if(url){
     v.style.display=''; empty.style.display='none';
     showLoaderS();
