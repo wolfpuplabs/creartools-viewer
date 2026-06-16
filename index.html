@@ -55,14 +55,16 @@
   // FBX viewer libs (Three.js FBXLoader + OrbitControls)
   window.__FBX_READY = (async () => {
     try{
-      const [THREE, fbxMod, ctrlMod] = await Promise.all([
+      const [THREE, fbxMod, ctrlMod, expMod] = await Promise.all([
         import('three'),
         import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js'),
-        import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js')
+        import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js'),
+        import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js')
       ]);
       window.__THREE = THREE;
       window.__FBXLoader = fbxMod.FBXLoader;
       window.__OrbitControls = ctrlMod.OrbitControls;
+      window.__GLTFExporter = expMod.GLTFExporter;
       return true;
     }catch(e){ console.warn('FBX libs failed to load', e); window.__FBXLoader=null; return false; }
   })();
@@ -260,6 +262,8 @@
   .preview-info .pv-sub{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.04em;color:var(--signal);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .preview-wrap > .iconbtn.del{position:absolute;top:10px;right:10px;z-index:4;background:rgba(8,8,10,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;width:34px;height:34px}
   .opt-toggle{display:flex;align-items:center;gap:10px;margin-top:11px;cursor:pointer;user-select:none}
+  .dropzone.busy{opacity:.6;pointer-events:none;animation:pulseDz 1s ease-in-out infinite}
+  @keyframes pulseDz{0%,100%{opacity:.6}50%{opacity:.85}}
   .opt-toggle input{position:absolute;opacity:0;width:0;height:0}
   .opt-toggle .ot-box{width:40px;height:23px;border-radius:20px;background:var(--surface-3);border:1px solid var(--line);position:relative;flex:0 0 auto;transition:.2s var(--ease)}
   .opt-toggle .ot-box::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--text-2);transition:.2s var(--ease)}
@@ -595,6 +599,7 @@
           </div>
 
           <div class="field" style="margin-top:13px"><label>Web / store link <span style="color:var(--text-3);font-weight:400">· optional</span></label><input id="linkUrl" type="url" inputmode="url" placeholder="https://store.example.com/item" /></div>
+          <label class="opt-toggle" id="convFbxRow" style="display:none"><input type="checkbox" id="convFbx" checked onchange="if(lastPickedModel&&/\.fbx$/i.test(lastPickedModel.name)) pick('glb',lastPickedModel)"><span class="ot-box"></span><span class="ot-lbl">Convert FBX → GLB (enables AR, embeds textures)</span></label>
           <label class="opt-toggle"><input type="checkbox" id="allowDl"><span class="ot-box"></span><span class="ot-lbl">Allow viewers to download the file</span></label>
 
           <input type="file" id="glbInput" hidden />
@@ -862,6 +867,21 @@ function captureFbxStage(){
     const cv=document.getElementById(fbxRootId||'fbxStage')?.querySelector('canvas');
     if(!cv) return null; const d=cv.toDataURL('image/png'); return (d&&d.length>3000)?d:null;
   }catch(e){ return null; }
+}
+let lastPickedModel=null;   // remember the originally chosen file so the FBX→GLB toggle can re-process it
+// convert an .fbx File into a real .glb File (embedded textures + animations carried over)
+async function convertFbxToGlb(file){
+  const ready = window.__FBXLoader || (window.__FBX_READY ? await window.__FBX_READY : false);
+  const THREE=window.__THREE, FBXLoader=window.__FBXLoader, GLTFExporter=window.__GLTFExporter;
+  if(!THREE||!FBXLoader||!GLTFExporter) throw new Error('FBX converter not ready');
+  const buf=await file.arrayBuffer();
+  const obj=new FBXLoader().parse(buf, '');
+  const anims=obj.animations||[];
+  const glb=await new Promise((res,rej)=>{
+    new GLTFExporter().parse(obj, r=>res(r), e=>rej(e), {binary:true, animations:anims, embedImages:true});
+  });
+  const base=(file.name.replace(/\.fbx$/i,'')||'model');
+  return new File([new Blob([glb],{type:'model/gltf-binary'})], base+'.glb', {type:'model/gltf-binary'});
 }
 
 /* ===================== INIT ===================== */
@@ -1202,10 +1222,40 @@ function pick(kind, file){
   if(!file) return;
   if(kind==='glb'){
     if(!/\.(glb|gltf|ply|splat|ksplat|fbx)$/i.test(file.name)){ toast('Model slot accepts .glb, .gltf, .ply, .splat, .ksplat or .fbx'); return; }
+    lastPickedModel=file;
     pendingGlb=file; dzGlb.classList.add('has');
     document.getElementById('glbText').textContent=file.name;
     document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
     const ni=document.getElementById('assetName'); if(!ni.value) ni.value=file.name.replace(/\.(glb|gltf|ply|splat|ksplat|fbx)$/i,'');
+    const fbx=/\.fbx$/i.test(file.name);
+    const convRow=document.getElementById('convFbxRow'); if(convRow) convRow.style.display = fbx ? 'flex' : 'none';
+    if(fbx && document.getElementById('convFbx') && document.getElementById('convFbx').checked){
+      // convert now so the preview + deploy use a real GLB (model-viewer + AR)
+      dzGlb.classList.add('busy');
+      document.getElementById('glbSub').textContent='converting FBX → GLB…';
+      convertFbxToGlb(file).then(glbFile=>{
+        dzGlb.classList.remove('busy');
+        pendingGlb=glbFile;
+        document.getElementById('glbText').textContent=glbFile.name;
+        document.getElementById('glbSub').textContent=(glbFile.size/1048576).toFixed(1)+' MB · GLB ready ✓';
+        const ni2=document.getElementById('assetName'); if(ni2 && (!ni2.value || ni2.value===file.name.replace(/\.fbx$/i,''))) ni2.value=glbFile.name.replace(/\.glb$/i,'');
+        if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
+        previewGlbUrl=URL.createObjectURL(glbFile);
+        showPreview();
+        toast('Converted to GLB — AR enabled');
+      }).catch(e=>{
+        dzGlb.classList.remove('busy');
+        console.warn('FBX→GLB failed', e);
+        toast('Conversion failed — keeping FBX (web only)');
+        pendingGlb=file;
+        document.getElementById('glbText').textContent=file.name;
+        document.getElementById('glbSub').textContent=(file.size/1048576).toFixed(1)+' MB · ready ✓';
+        if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
+        previewGlbUrl=URL.createObjectURL(file);
+        showPreview();
+      });
+      return;
+    }
     if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
     previewGlbUrl=URL.createObjectURL(file);
     showPreview();
@@ -1316,6 +1366,9 @@ function resetUpload(){
   document.getElementById('assetName').value=''; glbInput.value=''; usdzInput.value='';
   const lu=document.getElementById('linkUrl'); if(lu) lu.value='';
   const ad=document.getElementById('allowDl'); if(ad) ad.checked=false;
+  lastPickedModel=null;
+  const cfr=document.getElementById('convFbxRow'); if(cfr) cfr.style.display='none';
+  const cf=document.getElementById('convFbx'); if(cf) cf.checked=true;
   const tb=document.getElementById('tempShareBtn'); if(tb) tb.style.display='none';
   const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
   // clear preview
