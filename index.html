@@ -876,10 +876,13 @@ async function convertFbxToGlb(file){
   if(!THREE||!FBXLoader||!GLTFExporter) throw new Error('FBX converter not ready');
   const buf=await file.arrayBuffer();
   const obj=new FBXLoader().parse(buf, '');
-  const anims=obj.animations||[];
-  const glb=await new Promise((res,rej)=>{
-    new GLTFExporter().parse(obj, r=>res(r), e=>rej(e), {binary:true, animations:anims, embedImages:true});
+  const tryExport=(anims)=> new Promise((res,rej)=>{
+    try{ new GLTFExporter().parse(obj, r=>res(r), e=>rej(e), {binary:true, animations:anims, embedImages:true}); }
+    catch(e){ rej(e); }
   });
+  let glb;
+  try{ glb=await tryExport(obj.animations||[]); }
+  catch(e){ console.warn('GLB export with animations failed, retrying without', e); glb=await tryExport([]); }
   const base=(file.name.replace(/\.fbx$/i,'')||'model');
   return new File([new Blob([glb],{type:'model/gltf-binary'})], base+'.glb', {type:'model/gltf-binary'});
 }
@@ -1242,6 +1245,7 @@ function pick(kind, file){
         if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
         previewGlbUrl=URL.createObjectURL(glbFile);
         showPreview();
+        refreshDeployBtns();
         toast('Converted to GLB — AR enabled');
       }).catch(e=>{
         dzGlb.classList.remove('busy');
@@ -1253,6 +1257,7 @@ function pick(kind, file){
         if(previewGlbUrl) URL.revokeObjectURL(previewGlbUrl);
         previewGlbUrl=URL.createObjectURL(file);
         showPreview();
+        refreshDeployBtns();
       });
       return;
     }
@@ -1268,8 +1273,11 @@ function pick(kind, file){
     previewUsdzUrl=URL.createObjectURL(file);
     if(pendingGlb) showPreview();
   }
+  refreshDeployBtns();
+}
+function refreshDeployBtns(){
   const b=document.getElementById('deployBtn'), on=!!pendingGlb;
-  b.style.opacity=on?'1':'.5'; b.style.pointerEvents=on?'auto':'none';
+  if(b){ b.style.opacity=on?'1':'.5'; b.style.pointerEvents=on?'auto':'none'; }
   const tb=document.getElementById('tempShareBtn'); if(tb) tb.style.display=on?'':'none';
 }
 function previewName(){ return document.getElementById('assetName').value.trim() || (pendingGlb?pendingGlb.name.replace(/\.(glb|gltf)$/i,''):'Preview'); }
