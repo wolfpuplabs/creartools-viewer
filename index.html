@@ -599,7 +599,7 @@
           </div>
 
           <div class="field" style="margin-top:13px"><label>Web / store link <span style="color:var(--text-3);font-weight:400">· optional</span></label><input id="linkUrl" type="url" inputmode="url" placeholder="https://store.example.com/item" /></div>
-          <label class="opt-toggle" id="convFbxRow" style="display:none"><input type="checkbox" id="convFbx" checked onchange="if(lastPickedModel&&/\.fbx$/i.test(lastPickedModel.name)) pick('glb',lastPickedModel)"><span class="ot-box"></span><span class="ot-lbl">Convert FBX → GLB (enables AR, embeds textures)</span></label>
+          <label class="opt-toggle" id="convFbxRow" style="display:none"><input type="checkbox" id="convFbx" onchange="if(lastPickedModel&&/\.fbx$/i.test(lastPickedModel.name)) pick('glb',lastPickedModel)"><span class="ot-box"></span><span class="ot-lbl">Convert FBX → GLB (enables AR, embeds textures)</span></label>
           <label class="opt-toggle"><input type="checkbox" id="allowDl"><span class="ot-box"></span><span class="ot-lbl">Allow viewers to download the file</span></label>
 
           <input type="file" id="glbInput" hidden />
@@ -1376,7 +1376,7 @@ function resetUpload(){
   const ad=document.getElementById('allowDl'); if(ad) ad.checked=false;
   lastPickedModel=null;
   const cfr=document.getElementById('convFbxRow'); if(cfr) cfr.style.display='none';
-  const cf=document.getElementById('convFbx'); if(cf) cf.checked=true;
+  const cf=document.getElementById('convFbx'); if(cf) cf.checked=false;
   const tb=document.getElementById('tempShareBtn'); if(tb) tb.style.display='none';
   const b=document.getElementById('deployBtn'); b.style.opacity='.5'; b.style.pointerEvents='none';
   // clear preview
